@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """Alerte de stock hebdomadaire — THE BODY CLUB.
 
-Lit l'inventaire au format CSV et classe chaque produit sur trois niveaux :
+L'employé passe en revue les produits et choisit un niveau pour chacun :
 
-    🔴 ROUGE   commande urgente  (quantité <= seuil_urgent)
-    🟠 ORANGE  stock bas         (quantité <= seuil_bas)
+    🔴 ROUGE   commande urgente
+    🟠 ORANGE  stock bas
     🟢 VERT    stock suffisant
 
-Un produit dont la quantité ou les seuils ne sont pas renseignés reste
-⚪ À RENSEIGNER : il n'est jamais annoncé comme vert par défaut.
+Un produit pas encore passé en revue reste ⚪ : il n'est jamais annoncé
+comme vert par défaut.
 
 Exemples :
-    python3 alerte_stock.py
-    python3 alerte_stock.py --format markdown --sortie alerte.md
-    python3 alerte_stock.py --format feuille --sortie comptage.html
+    python3 alerte_stock.py --saisie                  # l'employé coche
+    python3 alerte_stock.py                           # le rapport à l'écran
+    python3 alerte_stock.py --format feuille --sortie feuille.html
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import argparse
 import csv
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from html import escape
 from pathlib import Path
@@ -33,9 +33,9 @@ FUSEAU = ZoneInfo("Europe/Paris")
 ROUGE = "rouge"
 ORANGE = "orange"
 VERT = "vert"
-INCONNU = "inconnu"
+INCONNU = ""  # cellule vide : produit pas encore passé en revue
 
-# Niveaux de stock proprement dits, du plus urgent au moins urgent.
+# Niveaux que l'employé peut choisir, du plus urgent au moins urgent.
 NIVEAUX_STOCK = (ROUGE, ORANGE, VERT)
 # Ordre d'affichage des sections du rapport.
 NIVEAUX = NIVEAUX_STOCK + (INCONNU,)
@@ -44,7 +44,7 @@ LIBELLES = {
     ROUGE: "Commande urgente",
     ORANGE: "Stock bas",
     VERT: "Stock suffisant",
-    INCONNU: "À renseigner",
+    INCONNU: "Pas encore vérifié",
 }
 
 PASTILLES = {ROUGE: "🔴", ORANGE: "🟠", VERT: "🟢", INCONNU: "⚪"}
@@ -53,31 +53,20 @@ ANSI = {ROUGE: "\033[31m", ORANGE: "\033[33m", VERT: "\033[32m", INCONNU: "\033[
 ANSI_GRAS = "\033[1m"
 ANSI_FIN = "\033[0m"
 
-COLONNES = (
-    "produit",
-    "categorie",
-    "unite",
-    "quantite",
-    "seuil_bas",
-    "seuil_urgent",
-    "fournisseur",
-)
+# Ce que l'employé peut taper ou écrire dans la colonne « niveau ».
+SYNONYMES = {
+    "r": ROUGE, "rouge": ROUGE, "🔴": ROUGE,
+    "o": ORANGE, "orange": ORANGE, "🟠": ORANGE,
+    "v": VERT, "vert": VERT, "verte": VERT, "🟢": VERT,
+}
+
+COLONNES = ("produit", "categorie", "niveau", "remarque")
 
 JOURS = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
 
 MOIS = (
-    "janvier",
-    "février",
-    "mars",
-    "avril",
-    "mai",
-    "juin",
-    "juillet",
-    "août",
-    "septembre",
-    "octobre",
-    "novembre",
-    "décembre",
+    "janvier", "février", "mars", "avril", "mai", "juin",
+    "juillet", "août", "septembre", "octobre", "novembre", "décembre",
 )
 
 
@@ -89,60 +78,28 @@ class ErreurInventaire(Exception):
 class Produit:
     nom: str
     categorie: str
-    unite: str
-    quantite: float | None
-    seuil_bas: float | None
-    seuil_urgent: float | None
-    fournisseur: str
-
-    @property
-    def niveau(self) -> str:
-        # Plusieurs catégories partagent les mêmes noms (Framboise en sirop et
-        # en sauce sucrée…) : rien ici ne dépend du nom seul.
-        if self.quantite is None or self.seuil_bas is None or self.seuil_urgent is None:
-            return INCONNU
-        if self.quantite <= self.seuil_urgent:
-            return ROUGE
-        if self.quantite <= self.seuil_bas:
-            return ORANGE
-        return VERT
-
-    @property
-    def manque(self) -> float:
-        """Quantité à commander pour repasser au-dessus du seuil bas."""
-        if self.quantite is None or self.seuil_bas is None:
-            return 0.0
-        return max(0.0, self.seuil_bas - self.quantite)
+    niveau: str
+    remarque: str = ""
 
     @property
     def intitule(self) -> str:
-        """« Sirops Monin › Framboise » — lève l'ambiguïté entre catégories."""
+        """« Sirops Monin › Framboise » — lève l'ambiguïté entre catégories.
+
+        Plusieurs noms se répètent d'une catégorie à l'autre (Framboise en
+        sirop et en sauce sucrée, Vanille, Matcha, Coco…) : c'est le couple
+        catégorie + produit qui identifie une référence.
+        """
         return f"{self.categorie} › {self.nom}"
 
-    def avec_unite(self, valeur: float | None) -> str:
-        if valeur is None:
-            return "—"
-        return f"{format_nombre(valeur)} {self.unite}"
 
-    def quantite_lisible(self) -> str:
-        return self.avec_unite(self.quantite)
-
-    def manque_lisible(self) -> str:
-        return self.avec_unite(self.manque)
-
-    def raison_inconnu(self) -> str:
-        if self.quantite is None and self.seuil_bas is None:
-            return "à compter et à paramétrer"
-        if self.quantite is None:
-            return "à compter"
-        return "seuils à définir"
-
-
-def format_nombre(valeur: float) -> str:
-    """23.0 -> «23», 2.5 -> «2,5» (virgule décimale française)."""
-    if valeur == int(valeur):
-        return str(int(valeur))
-    return f"{valeur:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+def normaliser_niveau(valeur: str | None) -> str:
+    """« R », « rouge », « 🔴 » -> ROUGE ; cellule vide -> INCONNU."""
+    texte = (valeur or "").strip().casefold()
+    if not texte:
+        return INCONNU
+    if texte not in SYNONYMES:
+        raise ValueError(valeur)
+    return SYNONYMES[texte]
 
 
 def date_lisible(moment: datetime) -> str:
@@ -150,25 +107,6 @@ def date_lisible(moment: datetime) -> str:
         f"{JOURS[moment.weekday()]} {moment.day} {MOIS[moment.month - 1]} "
         f"{moment.year}, {moment:%Hh%M}"
     )
-
-
-def _nombre(valeur: str | None, colonne: str, ligne: int) -> float | None:
-    """Convertit une cellule numérique ; une cellule vide vaut « non renseigné »."""
-    texte = (valeur or "").strip().replace(",", ".")
-    if not texte:
-        return None
-    try:
-        nombre = float(texte)
-    except ValueError as erreur:
-        raise ErreurInventaire(
-            f"ligne {ligne} : « {valeur} » n'est pas un nombre "
-            f"dans la colonne « {colonne} »."
-        ) from erreur
-    if nombre < 0:
-        raise ErreurInventaire(
-            f"ligne {ligne} : la colonne « {colonne} » ne peut pas être négative."
-        )
-    return nombre
 
 
 def lire_inventaire(chemin: Path) -> list[Produit]:
@@ -202,22 +140,20 @@ def lire_inventaire(chemin: Path) -> list[Produit]:
             )
         vus[cle] = numero
 
-        seuil_bas = _nombre(ligne["seuil_bas"], "seuil_bas", numero)
-        seuil_urgent = _nombre(ligne["seuil_urgent"], "seuil_urgent", numero)
-        if seuil_bas is not None and seuil_urgent is not None and seuil_urgent > seuil_bas:
+        try:
+            niveau = normaliser_niveau(ligne["niveau"])
+        except ValueError as erreur:
             raise ErreurInventaire(
-                f"ligne {numero} ({nom}) : seuil_urgent ({format_nombre(seuil_urgent)}) "
-                f"doit être inférieur ou égal à seuil_bas ({format_nombre(seuil_bas)})."
-            )
+                f"ligne {numero} ({nom}) : « {ligne['niveau']} » n'est pas un "
+                "niveau. Écrire vert, orange, rouge — ou laisser vide."
+            ) from erreur
+
         produits.append(
             Produit(
                 nom=nom,
                 categorie=categorie,
-                unite=(ligne.get("unite") or "").strip() or "unité",
-                quantite=_nombre(ligne["quantite"], "quantite", numero),
-                seuil_bas=seuil_bas,
-                seuil_urgent=seuil_urgent,
-                fournisseur=(ligne.get("fournisseur") or "").strip() or "—",
+                niveau=niveau,
+                remarque=(ligne.get("remarque") or "").strip(),
             )
         )
 
@@ -226,16 +162,23 @@ def lire_inventaire(chemin: Path) -> list[Produit]:
     return produits
 
 
+def ecrire_inventaire(chemin: Path, produits: list[Produit]) -> None:
+    with chemin.open("w", encoding="utf-8", newline="") as fichier:
+        redacteur = csv.writer(fichier)
+        redacteur.writerow(COLONNES)
+        for produit in produits:
+            redacteur.writerow(
+                [produit.nom, produit.categorie, produit.niveau, produit.remarque]
+            )
+
+
 def grouper(produits: list[Produit]) -> dict[str, list[Produit]]:
-    """Range les produits par niveau, les plus critiques d'abord dans chaque groupe."""
+    """Range les produits par niveau, par catégorie puis par nom."""
     groupes: dict[str, list[Produit]] = {niveau: [] for niveau in NIVEAUX}
     for produit in produits:
         groupes[produit.niveau].append(produit)
-    for niveau, liste in groupes.items():
-        if niveau == INCONNU:
-            liste.sort(key=lambda p: (p.categorie.casefold(), p.nom.casefold()))
-        else:
-            liste.sort(key=lambda p: (-p.manque, p.nom.casefold()))
+    for liste in groupes.values():
+        liste.sort(key=lambda p: (p.categorie.casefold(), p.nom.casefold()))
     return groupes
 
 
@@ -268,16 +211,103 @@ def consigne(global_: str, nb_inconnus: int = 0) -> str:
         texte = "👉 Rien à commander cette semaine. Bon week-end !"
     else:
         return (
-            "👉 Aucun produit n'a encore été compté : remplir la colonne "
-            "« quantite » d'inventaire.csv, puis relancer l'alerte."
+            "👉 Aucun produit n'a encore été vérifié cette semaine : lancer "
+            "« python3 alerte_stock.py --saisie »."
         )
     if nb_inconnus:
         texte += (
             f"\n⚪ Attention : {nb_inconnus} produit"
-            f"{'s ne sont' if nb_inconnus > 1 else ' n’est'} pas encore renseigné"
-            f"{'s' if nb_inconnus > 1 else ''} — leur niveau réel est inconnu."
+            f"{'s n’ont' if nb_inconnus > 1 else ' n’a'} pas encore été vérifié"
+            f"{'s' if nb_inconnus > 1 else ''}."
         )
     return texte
+
+
+# --------------------------------------------------------------------------
+# Saisie par l'employé
+# --------------------------------------------------------------------------
+
+AIDE_SAISIE = (
+    "  v = 🟢 vert (stock suffisant)   o = 🟠 orange (stock bas)   "
+    "r = 🔴 rouge (commande urgente)\n"
+    "  Entrée = garder le niveau actuel   x = effacer   p = passer la catégorie   "
+    "q = enregistrer et quitter"
+)
+
+
+def saisie_interactive(produits: list[Produit], entree=None, sortie=None) -> list[Produit]:
+    """Passe les produits en revue un par un et renvoie la liste mise à jour."""
+    entree = entree or sys.stdin
+    sortie = sortie or sys.stdout
+
+    def afficher(texte: str = "") -> None:
+        print(texte, file=sortie)
+
+    afficher("Relevé des stocks — THE BODY CLUB")
+    afficher(AIDE_SAISIE)
+
+    resultat = list(produits)
+    total = len(resultat)
+    categorie_sautee = None
+    indice = 0
+    while indice < total:
+        produit = resultat[indice]
+        if produit.categorie == categorie_sautee:
+            indice += 1
+            continue
+        categorie_sautee = None
+
+        if indice == 0 or produit.categorie != resultat[indice - 1].categorie:
+            afficher(f"\n— {produit.categorie} —")
+
+        actuel = f"{PASTILLES[produit.niveau]} {LIBELLES[produit.niveau].lower()}"
+        print(
+            f"[{indice + 1}/{total}] {produit.nom} ({actuel}) > ",
+            end="",
+            file=sortie,
+            flush=True,
+        )
+        reponse = entree.readline()
+        if not reponse:  # fin de saisie (Ctrl-D)
+            afficher()
+            break
+        reponse = reponse.strip().casefold()
+
+        if reponse == "q":
+            break
+        if reponse == "p":
+            categorie_sautee = produit.categorie
+            indice += 1
+            continue
+        if reponse == "":
+            indice += 1
+            continue
+        if reponse == "x":
+            resultat[indice] = replace(produit, niveau=INCONNU)
+            indice += 1
+            continue
+        try:
+            resultat[indice] = replace(produit, niveau=normaliser_niveau(reponse))
+        except ValueError:
+            afficher(f"  « {reponse} » n'est pas une réponse valable.")
+            afficher(AIDE_SAISIE)
+            continue  # on repose la même question
+        indice += 1
+
+    groupes = grouper(resultat)
+    afficher()
+    afficher(
+        "  ".join(
+            f"{PASTILLES[niveau]} {LIBELLES[niveau]} : {len(groupes[niveau])}"
+            for niveau in NIVEAUX
+        )
+    )
+    return resultat
+
+
+# --------------------------------------------------------------------------
+# Rapports
+# --------------------------------------------------------------------------
 
 
 def _couleurs_actives(flux) -> bool:
@@ -322,19 +352,21 @@ def rendu_texte(
             "-" * 68,
         ]
         for produit in produits:
-            if niveau == INCONNU:
-                lignes.append(f"  • {produit.intitule} — {produit.raison_inconnu()}")
-                continue
-            ligne = f"  • {produit.intitule} — reste {produit.quantite_lisible()}"
-            if niveau != VERT:
-                ligne += (
-                    f" (à commander : {produit.manque_lisible()}"
-                    f" — {produit.fournisseur})"
-                )
+            ligne = f"  • {produit.intitule}"
+            if produit.remarque:
+                ligne += f" — {produit.remarque}"
             lignes.append(ligne)
 
     lignes += ["", consigne(global_, len(groupes[INCONNU])), ""]
     return "\n".join(lignes)
+
+
+def _tableau_markdown(produits: list[Produit]) -> list[str]:
+    lignes = ["| Catégorie | Produit | Remarque |", "| --- | --- | --- |"]
+    lignes += [
+        f"| {p.categorie} | {p.nom} | {p.remarque or '—'} |" for p in produits
+    ]
+    return lignes
 
 
 def rendu_markdown(groupes: dict[str, list[Produit]], moment: datetime) -> str:
@@ -356,20 +388,8 @@ def rendu_markdown(groupes: dict[str, list[Produit]], moment: datetime) -> str:
         produits = groupes[niveau]
         if not produits:
             continue
-        lignes += [
-            "",
-            f"## {PASTILLES[niveau]} {LIBELLES[niveau]}",
-            "",
-            "| Catégorie | Produit | Restant | Seuil bas | À commander | Fournisseur |",
-            "| --- | --- | --- | --- | --- | --- |",
-        ]
-        for produit in produits:
-            a_commander = produit.manque_lisible() if niveau != VERT else "—"
-            lignes.append(
-                f"| {produit.categorie} | {produit.nom} | "
-                f"{produit.quantite_lisible()} | {produit.avec_unite(produit.seuil_bas)}"
-                f" | {a_commander} | {produit.fournisseur} |"
-            )
+        lignes += ["", f"## {PASTILLES[niveau]} {LIBELLES[niveau]}", ""]
+        lignes += _tableau_markdown(produits)
 
     inconnus = groupes[INCONNU]
     if inconnus:
@@ -378,12 +398,8 @@ def rendu_markdown(groupes: dict[str, list[Produit]], moment: datetime) -> str:
             f"<details><summary>{PASTILLES[INCONNU]} {LIBELLES[INCONNU]} "
             f"({len(inconnus)} produits)</summary>",
             "",
-            "| Catégorie | Produit | Ce qui manque |",
-            "| --- | --- | --- |",
         ]
-        lignes += [
-            f"| {p.categorie} | {p.nom} | {p.raison_inconnu()} |" for p in inconnus
-        ]
+        lignes += _tableau_markdown(inconnus)
         lignes += ["", "</details>"]
 
     lignes += ["", consigne(global_, len(inconnus)).replace("\n", "\n\n"), ""]
@@ -401,8 +417,7 @@ STYLE_IMPRESSION = """
   th, td { text-align: left; padding: .35rem .5rem;
            border-bottom: 1px solid rgba(0,0,0,.12); }
   th { font-weight: 600; }
-  td.case { width: 1.6rem; font-size: 1.1rem; }
-  td.saisie { width: 7rem; border-bottom: 1px solid #999; }
+  td.choix { width: 4.2rem; white-space: nowrap; letter-spacing: .15rem; }
   footer { margin-top: 2rem; font-weight: 600; white-space: pre-line; }
   @media print { body { margin: 0; } section { break-inside: avoid; } }
 """
@@ -439,30 +454,16 @@ def rendu_html(groupes: dict[str, list[Produit]], moment: datetime) -> str:
         if not produits:
             continue
         bordure, fond = TEINTES[niveau]
-        if niveau == INCONNU:
-            entetes = "<th>Catégorie</th><th>Produit</th><th>Ce qui manque</th>"
-            rangs = "\n".join(
-                f"<tr><td>{escape(p.categorie)}</td><td>{escape(p.nom)}</td>"
-                f"<td>{escape(p.raison_inconnu())}</td></tr>"
-                for p in produits
-            )
-        else:
-            entetes = (
-                "<th>Catégorie</th><th>Produit</th><th>Restant</th>"
-                "<th>À commander</th><th>Fournisseur</th>"
-            )
-            rangs = "\n".join(
-                f"<tr><td>{escape(p.categorie)}</td><td>{escape(p.nom)}</td>"
-                f"<td>{escape(p.quantite_lisible())}</td>"
-                f"<td>{escape(p.manque_lisible()) if niveau != VERT else '—'}</td>"
-                f"<td>{escape(p.fournisseur)}</td></tr>"
-                for p in produits
-            )
+        rangs = "\n".join(
+            f"<tr><td>{escape(p.categorie)}</td><td>{escape(p.nom)}</td>"
+            f"<td>{escape(p.remarque) or '—'}</td></tr>"
+            for p in produits
+        )
         sections.append(
             f"""<section style="border-left:8px solid {bordure};background:{fond}">
   <h2>{PASTILLES[niveau]} {LIBELLES[niveau]} — {len(produits)}</h2>
   <table>
-    <thead><tr>{entetes}</tr></thead>
+    <thead><tr><th>Catégorie</th><th>Produit</th><th>Remarque</th></tr></thead>
     <tbody>
 {rangs}
     </tbody>
@@ -482,21 +483,21 @@ def rendu_html(groupes: dict[str, list[Produit]], moment: datetime) -> str:
 
 
 def rendu_feuille(produits: list[Produit], moment: datetime) -> str:
-    """Feuille de comptage vierge à imprimer, une section par catégorie."""
+    """Feuille de relevé à imprimer : trois cases à cocher par produit."""
     sections = []
     for categorie, liste in par_categorie(produits).items():
         rangs = "\n".join(
-            f"<tr><td class='case'>☐</td><td>{escape(p.nom)}</td>"
-            f"<td>{escape(p.unite)}</td><td class='saisie'></td>"
-            f"<td>{escape(p.avec_unite(p.seuil_bas))}</td></tr>"
+            f"<tr><td>{escape(p.nom)}</td>"
+            "<td class='choix'>🟢 ☐</td><td class='choix'>🟠 ☐</td>"
+            "<td class='choix'>🔴 ☐</td><td></td></tr>"
             for p in liste
         )
         sections.append(
             f"""<section style="border-left:8px solid #1a1a1a;background:#fafafa">
   <h2>{escape(categorie)} — {len(liste)}</h2>
   <table>
-    <thead><tr><th></th><th>Produit</th><th>Unité</th><th>Quantité comptée</th>
-    <th>Seuil bas</th></tr></thead>
+    <thead><tr><th>Produit</th><th>Vert</th><th>Orange</th><th>Rouge</th>
+    <th>Remarque</th></tr></thead>
     <tbody>
 {rangs}
     </tbody>
@@ -505,21 +506,25 @@ def rendu_feuille(produits: list[Produit], moment: datetime) -> str:
         )
 
     return _page(
-        titre="Feuille de comptage — The Body Club",
+        titre="Relevé des stocks — The Body Club",
         chapeau=(
             f"{escape(date_lisible(moment))} — {len(produits)} références. "
-            "Cocher au fur et à mesure, noter la quantité restante, "
-            "puis reporter les chiffres dans inventaire.csv."
+            "🟢 stock suffisant · 🟠 stock bas · 🔴 commande urgente. "
+            "Cocher une case par produit, puis reporter dans inventaire.csv."
         ),
         corps="\n".join(sections),
-        pied="Comptage fait par : ______________________",
+        pied="Relevé fait par : ______________________",
     )
+
+
+# --------------------------------------------------------------------------
 
 
 def construire_parseur() -> argparse.ArgumentParser:
     parseur = argparse.ArgumentParser(
         description=(
-            "Alerte de stock hebdomadaire du Body Club (vert / orange / rouge)."
+            "Alerte de stock hebdomadaire du Body Club : l'employé choisit "
+            "vert, orange ou rouge pour chaque produit."
         ),
     )
     parseur.add_argument(
@@ -529,12 +534,22 @@ def construire_parseur() -> argparse.ArgumentParser:
         help="fichier CSV d'inventaire (défaut : inventaire.csv à côté du script)",
     )
     parseur.add_argument(
+        "--saisie",
+        action="store_true",
+        help="passer les produits en revue un par un et enregistrer les niveaux",
+    )
+    parseur.add_argument(
+        "--reinitialiser",
+        action="store_true",
+        help="effacer tous les niveaux pour repartir d'une semaine vierge",
+    )
+    parseur.add_argument(
         "--format",
         choices=("texte", "markdown", "html", "feuille"),
         default="texte",
         help=(
-            "rapport en texte, markdown ou html ; « feuille » produit la feuille "
-            "de comptage vierge à imprimer (défaut : texte)"
+            "rapport en texte, markdown ou html ; « feuille » produit le relevé "
+            "vierge à imprimer (défaut : texte)"
         ),
     )
     parseur.add_argument(
@@ -559,6 +574,23 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Erreur : {erreur}", file=sys.stderr)
         return 3
 
+    if arguments.reinitialiser:
+        produits = [replace(p, niveau=INCONNU, remarque="") for p in produits]
+        ecrire_inventaire(arguments.inventaire, produits)
+        print(f"{len(produits)} niveaux effacés dans {arguments.inventaire}.")
+        return 0
+
+    if arguments.saisie:
+        if not sys.stdin.isatty():
+            print(
+                "Erreur : --saisie a besoin d'un terminal interactif.",
+                file=sys.stderr,
+            )
+            return 3
+        produits = saisie_interactive(produits)
+        ecrire_inventaire(arguments.inventaire, produits)
+        print(f"\nRelevé enregistré dans {arguments.inventaire}.")
+
     groupes = grouper(produits)
     moment = datetime.now(FUSEAU)
 
@@ -576,7 +608,7 @@ def main(argv: list[str] | None = None) -> int:
         arguments.sortie.parent.mkdir(parents=True, exist_ok=True)
         arguments.sortie.write_text(rapport, encoding="utf-8")
         print(f"Rapport écrit dans {arguments.sortie}")
-    else:
+    elif not arguments.saisie:
         print(rapport)
 
     if arguments.code_sortie:
