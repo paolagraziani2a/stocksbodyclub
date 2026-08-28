@@ -1,12 +1,11 @@
-name: Alerte stock du vendredi
+name: Alerte stock (archive)
 
+# Le relevé du vendredi se fait désormais sur la page iPad, et le rapport
+# part par notification et par e-mail (Routine « Relevé stocks Body Club —
+# vendredi 15h »). Ce workflow ne tourne donc plus tout seul : il sert à
+# produire une archive imprimable à partir d'un inventaire.csv exporté
+# depuis la page. On le lance à la main depuis l'onglet Actions.
 on:
-  schedule:
-    # GitHub planifie en UTC. 15h à Paris = 13h UTC en été (UTC+2)
-    # et 14h UTC en hiver (UTC+1) : on déclenche aux deux heures et
-    # l'étape « Vérifier l'heure de Paris » annule le déclenchement en trop.
-    - cron: '0 13 * * 5'
-    - cron: '0 14 * * 5'
   workflow_dispatch:
     inputs:
       forcer:

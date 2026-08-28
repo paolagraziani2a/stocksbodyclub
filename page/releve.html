@@ -1,0 +1,1495 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Relevé Body Club</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --fond: #faf7f2;
+  --surface: #ffffff;
+  --surface-2: #f4eff5;
+  --encre: #241e28;
+  --sourdine: #6f6577;
+  --trait: #e6dfe6;
+  --accent: #6d3a9c;
+  --accent-doux: #f0e6f8;
+  --vert: #137a4c;
+  --vert-fond: #e4f3ea;
+  --orange: #b45a08;
+  --orange-fond: #fdeedc;
+  --rouge: #b92d22;
+  --rouge-fond: #fbe7e4;
+  --ombre: 0 1px 2px rgba(36, 30, 40, .06), 0 8px 24px rgba(36, 30, 40, .05);
+  --rayon: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fond: #14101a;
+    --surface: #1e1926;
+    --surface-2: #272031;
+    --encre: #f1ebf4;
+    --sourdine: #a497ae;
+    --trait: #2e2739;
+    --accent: #c39bee;
+    --accent-doux: #2b2036;
+    --vert: #4fcb8d;
+    --vert-fond: #13291f;
+    --orange: #f2a64a;
+    --orange-fond: #2e2114;
+    --rouge: #ff8172;
+    --rouge-fond: #331a18;
+    --ombre: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+  }
+}
+:root[data-theme="dark"] {
+  --fond: #14101a;
+  --surface: #1e1926;
+  --surface-2: #272031;
+  --encre: #f1ebf4;
+  --sourdine: #a497ae;
+  --trait: #2e2739;
+  --accent: #c39bee;
+  --accent-doux: #2b2036;
+  --vert: #4fcb8d;
+  --vert-fond: #13291f;
+  --orange: #f2a64a;
+  --orange-fond: #2e2114;
+  --rouge: #ff8172;
+  --rouge-fond: #331a18;
+  --ombre: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--fond);
+  color: var(--encre);
+  font-family: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+#page { max-width: 60rem; margin: 0 auto; padding: 0 1rem 6rem; }
+
+/* ---------- en-tête ---------- */
+.entete {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--fond) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--trait);
+  margin: 0 -1rem; padding: .85rem 1rem .6rem;
+}
+.entete-haut { display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap; }
+h1 {
+  font-family: "Bricolage Grotesque", "Instrument Sans", sans-serif;
+  font-weight: 700; font-size: 1.35rem; letter-spacing: -.015em;
+  margin: 0; text-wrap: balance;
+}
+.enseigne {
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .14em;
+  color: var(--accent); font-weight: 600;
+}
+.statut {
+  margin-left: auto; font-size: .78rem; color: var(--sourdine);
+  display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap;
+}
+.statut::before {
+  content: ""; width: .5rem; height: .5rem; border-radius: 50%;
+  background: var(--sourdine); flex: none;
+}
+.statut[data-etat="ok"]::before { background: var(--vert); }
+.statut[data-etat="attente"]::before, .statut[data-etat="cours"]::before { background: var(--orange); }
+.statut[data-etat="erreur"]::before { background: var(--rouge); }
+
+.jauge {
+  margin: .6rem 0 .5rem; height: 6px; border-radius: 99px;
+  background: var(--surface-2); overflow: hidden;
+}
+.jauge > i { display: block; height: 100%; background: var(--accent); transition: width .25s ease; }
+@media (prefers-reduced-motion: reduce) { .jauge > i { transition: none; } }
+
+.compteurs { display: flex; gap: .4rem; flex-wrap: wrap; }
+.puce {
+  border: 1px solid var(--trait); background: var(--surface);
+  border-radius: 99px; padding: .3rem .7rem;
+  font-size: .82rem; font-weight: 500; font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; gap: .35rem;
+  cursor: pointer; color: var(--encre);
+  font-family: inherit;
+}
+.puce b { font-weight: 600; }
+.puce[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-doux); }
+.puce .pastille { width: .62rem; height: .62rem; border-radius: 50%; flex: none; }
+.puce[data-niveau="vert"] .pastille { background: var(--vert); }
+.puce[data-niveau="orange"] .pastille { background: var(--orange); }
+.puce[data-niveau="rouge"] .pastille { background: var(--rouge); }
+.puce[data-niveau=""] .pastille { background: transparent; border: 1.5px solid var(--sourdine); }
+
+/* ---------- bandeaux ---------- */
+.bandeau {
+  margin: .9rem 0 0; padding: .7rem .9rem; border-radius: var(--rayon);
+  font-size: .9rem; border: 1px solid var(--trait); background: var(--surface);
+}
+.bandeau.vendredi { border-color: var(--accent); background: var(--accent-doux); color: var(--encre); }
+.bandeau.avertissement { border-color: var(--orange); background: var(--orange-fond); color: var(--encre); }
+.bandeau[hidden] { display: none; }
+
+/* ---------- sélecteur de catégorie ---------- */
+.barre-outils {
+  display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+  margin: 1rem 0 .25rem;
+}
+select.saut {
+  font-family: inherit; font-size: .88rem; color: var(--encre);
+  background: var(--surface); border: 1px solid var(--trait);
+  border-radius: 99px; padding: .45rem 1.9rem .45rem .8rem; min-height: 2.4rem;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 1rem center, right .72rem center;
+  background-size: .3rem .3rem, .3rem .3rem;
+  background-repeat: no-repeat;
+}
+
+/* ---------- catégories & lignes ---------- */
+h2 {
+  font-family: "Bricolage Grotesque", "Instrument Sans", sans-serif;
+  font-weight: 500; font-size: .78rem; text-transform: uppercase;
+  letter-spacing: .12em; color: var(--sourdine);
+  margin: 1.8rem 0 .5rem; scroll-margin-top: 8.5rem;
+  display: flex; align-items: baseline; gap: .5rem;
+}
+h2 .reste { font-size: .72rem; letter-spacing: .04em; text-transform: none; color: var(--accent); }
+.groupe { display: flex; flex-direction: column; gap: .4rem; }
+
+.ligne {
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--trait);
+  border-left: 4px solid var(--trait);
+  border-radius: var(--rayon); padding: .55rem .7rem .55rem .85rem;
+  box-shadow: var(--ombre);
+}
+.ligne[data-niveau="vert"] { border-left-color: var(--vert); background: var(--vert-fond); }
+.ligne[data-niveau="orange"] { border-left-color: var(--orange); background: var(--orange-fond); }
+.ligne[data-niveau="rouge"] { border-left-color: var(--rouge); background: var(--rouge-fond); }
+.ligne[hidden] { display: none; }
+.nom { flex: 1 1 12rem; font-weight: 500; min-width: 0; }
+
+.choix { display: flex; gap: .3rem; flex: none; }
+.choix button {
+  font-family: inherit; font-size: .8rem; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase;
+  min-width: 3.6rem; min-height: 2.9rem; padding: 0 .55rem;
+  border-radius: 9px; cursor: pointer;
+  border: 1.5px solid var(--trait); background: var(--surface); color: var(--sourdine);
+  transition: transform .08s ease;
+}
+@media (prefers-reduced-motion: reduce) { .choix button { transition: none; } }
+.choix button:active { transform: scale(.95); }
+.choix button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.choix button[data-n="vert"][aria-pressed="true"] { background: var(--vert); border-color: var(--vert); color: var(--surface); }
+.choix button[data-n="orange"][aria-pressed="true"] { background: var(--orange); border-color: var(--orange); color: var(--surface); }
+.choix button[data-n="rouge"][aria-pressed="true"] { background: var(--rouge); border-color: var(--rouge); color: var(--surface); }
+:root[data-theme="dark"] .choix button[aria-pressed="true"],
+:root:not([data-theme="light"]) .choix button[aria-pressed="true"] { color: #14101a; }
+
+.note {
+  flex: 1 1 100%; font-family: inherit; font-size: .86rem;
+  color: var(--encre); background: transparent;
+  border: none; border-top: 1px dashed var(--trait);
+  padding: .45rem .1rem .1rem; margin-top: .1rem; min-height: 2.2rem;
+}
+.note::placeholder { color: var(--sourdine); }
+.note:focus-visible { outline: none; border-top-color: var(--accent); }
+.note[hidden] { display: none; }
+
+/* ---------- pied ---------- */
+.pied { margin-top: 2.5rem; border-top: 1px solid var(--trait); padding-top: 1.25rem; }
+.pied h3 {
+  font-family: "Bricolage Grotesque", "Instrument Sans", sans-serif;
+  font-size: 1rem; font-weight: 700; margin: 0 0 .5rem;
+}
+.commande { margin: 0 0 1.25rem; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: .3rem; font-size: .92rem; }
+.commande li { display: flex; gap: .5rem; align-items: baseline; }
+.commande .pastille { width: .6rem; height: .6rem; border-radius: 50%; flex: none; transform: translateY(-1px); }
+.commande li[data-niveau="rouge"] .pastille { background: var(--rouge); }
+.commande li[data-niveau="orange"] .pastille { background: var(--orange); }
+.commande .cat { color: var(--sourdine); font-size: .82rem; }
+.commande .rem { color: var(--sourdine); font-style: italic; }
+.vide { color: var(--sourdine); font-size: .92rem; margin: 0 0 1.25rem; }
+
+.actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.actions button {
+  font-family: inherit; font-size: .88rem; font-weight: 500;
+  min-height: 2.75rem; padding: 0 1rem; border-radius: 99px; cursor: pointer;
+  border: 1px solid var(--trait); background: var(--surface); color: var(--encre);
+}
+.actions button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.actions button[hidden] { display: none; }
+.legende { margin: 1.5rem 0 0; font-size: .8rem; color: var(--sourdine); }
+</style>
+<div id="page">
+  <header class="entete">
+    <div class="entete-haut">
+      <span class="enseigne">The Body Club</span>
+      <h1>Relevé des stocks</h1>
+      <span class="statut" id="statut" data-etat="local">Chargement…</span>
+    </div>
+    <div class="jauge"><i id="jauge" style="width:0%"></i></div>
+    <div class="compteurs" id="compteurs"></div>
+  </header>
+
+  <div class="bandeau vendredi" id="bandeau-vendredi" hidden></div>
+  <div class="bandeau avertissement" id="bandeau-lecture" hidden></div>
+
+  <div class="barre-outils">
+    <select class="saut" id="saut" aria-label="Aller à une catégorie"></select>
+  </div>
+
+  <main id="liste"></main>
+
+  <section class="pied">
+    <h3>Liste de commande</h3>
+    <ul class="commande" id="commande"></ul>
+    <p class="vide" id="commande-vide" hidden>Rien à commander pour l'instant.</p>
+    <div class="actions">
+      <button type="button" id="exporter">Exporter en CSV</button>
+      <button type="button" id="reinitialiser">Nouvelle semaine</button>
+    </div>
+    <p class="legende" id="legende"></p>
+  </section>
+</div>
+
+<script type="application/json" id="etat">{"enseigne": "The Body Club", "semaine": "2026-S35", "maj": "", "produits": [{"nom": "Protéine nature", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Monin frappé", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Café grains", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Matcha collagène", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Matcha foncé", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Matcha clair", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "UBE liquide", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "UBE poudre", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Spiruline bleue", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Spiruline verte", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Spiruline liquide", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Sucre", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Beurre de cacahuète", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Confiture", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Purée de sésame", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Crème pistache", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Cumin", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Ail", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Cannelle", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Granola", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Graines de chia", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Baies", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Morceaux de pommes", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Pêches", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Coco", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Fraises", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Oreo", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Spéculoos", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Noisettes caramélisées", "cat": "Alimentaire", "niveau": "", "note": ""}, {"nom": "Lait avoine", "cat": "Laits & frais", "niveau": "", "note": ""}, {"nom": "Lait coco", "cat": "Laits & frais", "niveau": "", "note": ""}, {"nom": "Lait écrémé", "cat": "Laits & frais", "niveau": "", "note": ""}, {"nom": "Crème légère", "cat": "Laits & frais", "niveau": "", "note": ""}, {"nom": "Vanille", "cat": "Laits & frais", "niveau": "", "note": ""}, {"nom": "Mascarpone", "cat": "Laits & frais", "niveau": "", "note": ""}, {"nom": "Sauce soja", "cat": "Sauces cuisine", "niveau": "", "note": ""}, {"nom": "Sauce poke", "cat": "Sauces cuisine", "niveau": "", "note": ""}, {"nom": "Huile d'olive", "cat": "Sauces cuisine", "niveau": "", "note": ""}, {"nom": "Detox", "cat": "Symples", "niveau": "", "note": ""}, {"nom": "Relax", "cat": "Symples", "niveau": "", "note": ""}, {"nom": "Basilic", "cat": "Symples", "niveau": "", "note": ""}, {"nom": "Vitamin Well framboise", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Vitamin Well citron", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Vitamin Well pêche", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Kombucha Archipel framboise", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Kombucha citron", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Embrace citron", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Embrace pêche", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Embrace pêche menthe", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Embrace citron framboise", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Embrace framboise pêche", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Bubble Tea", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Water Power citron", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Shot Ginger turmeric", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Shot Ginger citron", "cat": "Boissons", "niveau": "", "note": ""}, {"nom": "Framboise", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Fraise", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Mangue", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Pêche", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Coco", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Concombre", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Pistache", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Vanille", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Vanille sans sucre", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Amaretto", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Matcha", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Chocolat", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Noisette", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Spéculoos", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Tiramisu", "cat": "Sirops Monin", "niveau": "", "note": ""}, {"nom": "Mangue", "cat": "Sauces sucrées", "niveau": "", "note": ""}, {"nom": "Framboise", "cat": "Sauces sucrées", "niveau": "", "note": ""}, {"nom": "Fraise", "cat": "Sauces sucrées", "niveau": "", "note": ""}, {"nom": "Banane", "cat": "Sauces sucrées", "niveau": "", "note": ""}, {"nom": "Chocolat", "cat": "Sauces sucrées", "niveau": "", "note": ""}, {"nom": "Caramel", "cat": "Sauces sucrées", "niveau": "", "note": ""}, {"nom": "Spéculoos", "cat": "Sauces sucrées", "niveau": "", "note": ""}, {"nom": "Matcha", "cat": "Maya", "niveau": "", "note": ""}, {"nom": "Goyave", "cat": "Maya", "niveau": "", "note": ""}, {"nom": "Eau coco", "cat": "Maya", "niveau": "", "note": ""}, {"nom": "Litchi", "cat": "Maya", "niveau": "", "note": ""}, {"nom": "PAM", "cat": "Maya", "niveau": "", "note": ""}, {"nom": "Zilia 1,5 L", "cat": "Eaux", "niveau": "", "note": ""}, {"nom": "Zilia 33 cl", "cat": "Eaux", "niveau": "", "note": ""}, {"nom": "St-Georges 33 cl", "cat": "Eaux", "niveau": "", "note": ""}, {"nom": "Summer", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Blue Colada", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Detox", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Muscle Up", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Big Brain", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Sweet Coffee", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Body Club Rond", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Body Club Simple", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Poke Saumon", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Poke Crevette", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Poke Rosbeef", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Poke Poulet", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Poke Thon", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Salade Thaï Crevettes", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Caesar Salad", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Kendall Jenner's Fit Salad", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Glowy Crunch", "cat": "Étiquettes", "niveau": "", "note": ""}, {"nom": "Couverts", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Cuillères", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Verres matcha", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Couvercles matcha", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Pots desserts", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Couvercles pots desserts", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Grands verres Body Club", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Petits verres Body Club", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Petits verres à emporter", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Couvercles à emporter", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Verres smoothies", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Couvercles smoothies", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Pailles", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Pots salades", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Couvercles salades", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Sopalins dispo", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Boîtes gâteaux", "cat": "Emballages / consommables", "niveau": "", "note": ""}, {"nom": "Éponge", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Liquide vaisselle", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Sopalin", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Papier toilette", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Sopalin toilette", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Lingettes désinfectantes", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Lave-vitre", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Désinfectant", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Désinfectant alimentaire", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Gants", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Produit lave-sol", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Sacs-poubelle", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Eau de Javel", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Pastilles vaisselle", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Savon Tork", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Savon antimicrobien", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Savon douche", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Produit nettoyage machine café", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Dégraissant alimentaire", "cat": "Ménager", "niveau": "", "note": ""}, {"nom": "Sel", "cat": "Divers", "niveau": "", "note": ""}, {"nom": "Poivre", "cat": "Divers", "niveau": "", "note": ""}]}</script>
+<script type="text/plain" id="modele"><!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Relevé Body Club<\/title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --fond: #faf7f2;
+  --surface: #ffffff;
+  --surface-2: #f4eff5;
+  --encre: #241e28;
+  --sourdine: #6f6577;
+  --trait: #e6dfe6;
+  --accent: #6d3a9c;
+  --accent-doux: #f0e6f8;
+  --vert: #137a4c;
+  --vert-fond: #e4f3ea;
+  --orange: #b45a08;
+  --orange-fond: #fdeedc;
+  --rouge: #b92d22;
+  --rouge-fond: #fbe7e4;
+  --ombre: 0 1px 2px rgba(36, 30, 40, .06), 0 8px 24px rgba(36, 30, 40, .05);
+  --rayon: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fond: #14101a;
+    --surface: #1e1926;
+    --surface-2: #272031;
+    --encre: #f1ebf4;
+    --sourdine: #a497ae;
+    --trait: #2e2739;
+    --accent: #c39bee;
+    --accent-doux: #2b2036;
+    --vert: #4fcb8d;
+    --vert-fond: #13291f;
+    --orange: #f2a64a;
+    --orange-fond: #2e2114;
+    --rouge: #ff8172;
+    --rouge-fond: #331a18;
+    --ombre: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+  }
+}
+:root[data-theme="dark"] {
+  --fond: #14101a;
+  --surface: #1e1926;
+  --surface-2: #272031;
+  --encre: #f1ebf4;
+  --sourdine: #a497ae;
+  --trait: #2e2739;
+  --accent: #c39bee;
+  --accent-doux: #2b2036;
+  --vert: #4fcb8d;
+  --vert-fond: #13291f;
+  --orange: #f2a64a;
+  --orange-fond: #2e2114;
+  --rouge: #ff8172;
+  --rouge-fond: #331a18;
+  --ombre: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--fond);
+  color: var(--encre);
+  font-family: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+#page { max-width: 60rem; margin: 0 auto; padding: 0 1rem 6rem; }
+
+/* ---------- en-tête ---------- */
+.entete {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--fond) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--trait);
+  margin: 0 -1rem; padding: .85rem 1rem .6rem;
+}
+.entete-haut { display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap; }
+h1 {
+  font-family: "Bricolage Grotesque", "Instrument Sans", sans-serif;
+  font-weight: 700; font-size: 1.35rem; letter-spacing: -.015em;
+  margin: 0; text-wrap: balance;
+}
+.enseigne {
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .14em;
+  color: var(--accent); font-weight: 600;
+}
+.statut {
+  margin-left: auto; font-size: .78rem; color: var(--sourdine);
+  display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap;
+}
+.statut::before {
+  content: ""; width: .5rem; height: .5rem; border-radius: 50%;
+  background: var(--sourdine); flex: none;
+}
+.statut[data-etat="ok"]::before { background: var(--vert); }
+.statut[data-etat="attente"]::before, .statut[data-etat="cours"]::before { background: var(--orange); }
+.statut[data-etat="erreur"]::before { background: var(--rouge); }
+
+.jauge {
+  margin: .6rem 0 .5rem; height: 6px; border-radius: 99px;
+  background: var(--surface-2); overflow: hidden;
+}
+.jauge > i { display: block; height: 100%; background: var(--accent); transition: width .25s ease; }
+@media (prefers-reduced-motion: reduce) { .jauge > i { transition: none; } }
+
+.compteurs { display: flex; gap: .4rem; flex-wrap: wrap; }
+.puce {
+  border: 1px solid var(--trait); background: var(--surface);
+  border-radius: 99px; padding: .3rem .7rem;
+  font-size: .82rem; font-weight: 500; font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; gap: .35rem;
+  cursor: pointer; color: var(--encre);
+  font-family: inherit;
+}
+.puce b { font-weight: 600; }
+.puce[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-doux); }
+.puce .pastille { width: .62rem; height: .62rem; border-radius: 50%; flex: none; }
+.puce[data-niveau="vert"] .pastille { background: var(--vert); }
+.puce[data-niveau="orange"] .pastille { background: var(--orange); }
+.puce[data-niveau="rouge"] .pastille { background: var(--rouge); }
+.puce[data-niveau=""] .pastille { background: transparent; border: 1.5px solid var(--sourdine); }
+
+/* ---------- bandeaux ---------- */
+.bandeau {
+  margin: .9rem 0 0; padding: .7rem .9rem; border-radius: var(--rayon);
+  font-size: .9rem; border: 1px solid var(--trait); background: var(--surface);
+}
+.bandeau.vendredi { border-color: var(--accent); background: var(--accent-doux); color: var(--encre); }
+.bandeau.avertissement { border-color: var(--orange); background: var(--orange-fond); color: var(--encre); }
+.bandeau[hidden] { display: none; }
+
+/* ---------- sélecteur de catégorie ---------- */
+.barre-outils {
+  display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+  margin: 1rem 0 .25rem;
+}
+select.saut {
+  font-family: inherit; font-size: .88rem; color: var(--encre);
+  background: var(--surface); border: 1px solid var(--trait);
+  border-radius: 99px; padding: .45rem 1.9rem .45rem .8rem; min-height: 2.4rem;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 1rem center, right .72rem center;
+  background-size: .3rem .3rem, .3rem .3rem;
+  background-repeat: no-repeat;
+}
+
+/* ---------- catégories & lignes ---------- */
+h2 {
+  font-family: "Bricolage Grotesque", "Instrument Sans", sans-serif;
+  font-weight: 500; font-size: .78rem; text-transform: uppercase;
+  letter-spacing: .12em; color: var(--sourdine);
+  margin: 1.8rem 0 .5rem; scroll-margin-top: 8.5rem;
+  display: flex; align-items: baseline; gap: .5rem;
+}
+h2 .reste { font-size: .72rem; letter-spacing: .04em; text-transform: none; color: var(--accent); }
+.groupe { display: flex; flex-direction: column; gap: .4rem; }
+
+.ligne {
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--trait);
+  border-left: 4px solid var(--trait);
+  border-radius: var(--rayon); padding: .55rem .7rem .55rem .85rem;
+  box-shadow: var(--ombre);
+}
+.ligne[data-niveau="vert"] { border-left-color: var(--vert); background: var(--vert-fond); }
+.ligne[data-niveau="orange"] { border-left-color: var(--orange); background: var(--orange-fond); }
+.ligne[data-niveau="rouge"] { border-left-color: var(--rouge); background: var(--rouge-fond); }
+.ligne[hidden] { display: none; }
+.nom { flex: 1 1 12rem; font-weight: 500; min-width: 0; }
+
+.choix { display: flex; gap: .3rem; flex: none; }
+.choix button {
+  font-family: inherit; font-size: .8rem; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase;
+  min-width: 3.6rem; min-height: 2.9rem; padding: 0 .55rem;
+  border-radius: 9px; cursor: pointer;
+  border: 1.5px solid var(--trait); background: var(--surface); color: var(--sourdine);
+  transition: transform .08s ease;
+}
+@media (prefers-reduced-motion: reduce) { .choix button { transition: none; } }
+.choix button:active { transform: scale(.95); }
+.choix button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.choix button[data-n="vert"][aria-pressed="true"] { background: var(--vert); border-color: var(--vert); color: var(--surface); }
+.choix button[data-n="orange"][aria-pressed="true"] { background: var(--orange); border-color: var(--orange); color: var(--surface); }
+.choix button[data-n="rouge"][aria-pressed="true"] { background: var(--rouge); border-color: var(--rouge); color: var(--surface); }
+:root[data-theme="dark"] .choix button[aria-pressed="true"],
+:root:not([data-theme="light"]) .choix button[aria-pressed="true"] { color: #14101a; }
+
+.note {
+  flex: 1 1 100%; font-family: inherit; font-size: .86rem;
+  color: var(--encre); background: transparent;
+  border: none; border-top: 1px dashed var(--trait);
+  padding: .45rem .1rem .1rem; margin-top: .1rem; min-height: 2.2rem;
+}
+.note::placeholder { color: var(--sourdine); }
+.note:focus-visible { outline: none; border-top-color: var(--accent); }
+.note[hidden] { display: none; }
+
+/* ---------- pied ---------- */
+.pied { margin-top: 2.5rem; border-top: 1px solid var(--trait); padding-top: 1.25rem; }
+.pied h3 {
+  font-family: "Bricolage Grotesque", "Instrument Sans", sans-serif;
+  font-size: 1rem; font-weight: 700; margin: 0 0 .5rem;
+}
+.commande { margin: 0 0 1.25rem; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: .3rem; font-size: .92rem; }
+.commande li { display: flex; gap: .5rem; align-items: baseline; }
+.commande .pastille { width: .6rem; height: .6rem; border-radius: 50%; flex: none; transform: translateY(-1px); }
+.commande li[data-niveau="rouge"] .pastille { background: var(--rouge); }
+.commande li[data-niveau="orange"] .pastille { background: var(--orange); }
+.commande .cat { color: var(--sourdine); font-size: .82rem; }
+.commande .rem { color: var(--sourdine); font-style: italic; }
+.vide { color: var(--sourdine); font-size: .92rem; margin: 0 0 1.25rem; }
+
+.actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.actions button {
+  font-family: inherit; font-size: .88rem; font-weight: 500;
+  min-height: 2.75rem; padding: 0 1rem; border-radius: 99px; cursor: pointer;
+  border: 1px solid var(--trait); background: var(--surface); color: var(--encre);
+}
+.actions button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.actions button[hidden] { display: none; }
+.legende { margin: 1.5rem 0 0; font-size: .8rem; color: var(--sourdine); }
+<\/style>
+<\/head>
+<body>
+<div id="page">
+  <header class="entete">
+    <div class="entete-haut">
+      <span class="enseigne">The Body Club<\/span>
+      <h1>Relevé des stocks<\/h1>
+      <span class="statut" id="statut" data-etat="local">Chargement…<\/span>
+    <\/div>
+    <div class="jauge"><i id="jauge" style="width:0%"><\/i><\/div>
+    <div class="compteurs" id="compteurs"><\/div>
+  <\/header>
+
+  <div class="bandeau vendredi" id="bandeau-vendredi" hidden><\/div>
+  <div class="bandeau avertissement" id="bandeau-lecture" hidden><\/div>
+
+  <div class="barre-outils">
+    <select class="saut" id="saut" aria-label="Aller à une catégorie"><\/select>
+  <\/div>
+
+  <main id="liste"><\/main>
+
+  <section class="pied">
+    <h3>Liste de commande<\/h3>
+    <ul class="commande" id="commande"><\/ul>
+    <p class="vide" id="commande-vide" hidden>Rien à commander pour l'instant.<\/p>
+    <div class="actions">
+      <button type="button" id="exporter">Exporter en CSV<\/button>
+      <button type="button" id="reinitialiser">Nouvelle semaine<\/button>
+    <\/div>
+    <p class="legende" id="legende"><\/p>
+  <\/section>
+<\/div>
+
+<script type="application/json" id="etat">__ETAT__<\/script>
+<script type="text/plain" id="modele">__MODELE__<\/script>
+<script>
+(function () {
+  "use strict";
+
+  var NIVEAUX = ["rouge", "orange", "vert"];
+  var LIBELLES = {
+    rouge: "Commande urgente",
+    orange: "Stock bas",
+    vert: "Stock suffisant",
+    "": "Pas encore vérifié"
+  };
+  var COURTS = { rouge: "Rouge", orange: "Orange", vert: "Vert" };
+
+  var etat = JSON.parse(document.getElementById("etat").textContent);
+  var art = null;
+  var lectureSeule = false;
+  var minuteur = null;
+  var delaiSauvegarde = 2000;
+  var reessaye = false;
+  var filtre = "tout";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var cle = function (p) { return p.cat + " \u203a " + p.nom; };
+
+  /* ------------------------------------------------------------------ */
+  /* Rendu                                                               */
+  /* ------------------------------------------------------------------ */
+
+  function categories() {
+    var ordre = [];
+    var index = {};
+    etat.produits.forEach(function (p) {
+      if (!index[p.cat]) { index[p.cat] = []; ordre.push(p.cat); }
+      index[p.cat].push(p);
+    });
+    return ordre.map(function (c) { return { nom: c, produits: index[c] }; });
+  }
+
+  function visible(p) {
+    if (filtre === "tout") return true;
+    if (filtre === "afaire") return !p.niveau;
+    return p.niveau === filtre;
+  }
+
+  function construireListe() {
+    var liste = $("liste");
+    liste.textContent = "";
+    var saut = $("saut");
+    saut.textContent = "";
+    saut.appendChild(new Option("Aller à une catégorie…", ""));
+
+    categories().forEach(function (groupe, i) {
+      var id = "cat-" + i;
+      var titre = document.createElement("h2");
+      titre.id = id;
+      titre.appendChild(document.createTextNode(groupe.nom));
+      var reste = document.createElement("span");
+      reste.className = "reste";
+      reste.dataset.cat = groupe.nom;
+      titre.appendChild(reste);
+      liste.appendChild(titre);
+
+      var bloc = document.createElement("div");
+      bloc.className = "groupe";
+      groupe.produits.forEach(function (p) { bloc.appendChild(construireLigne(p)); });
+      liste.appendChild(bloc);
+
+      saut.appendChild(new Option(groupe.nom + " (" + groupe.produits.length + ")", id));
+    });
+  }
+
+  function construireLigne(p) {
+    var ligne = document.createElement("div");
+    ligne.className = "ligne";
+    ligne.dataset.cle = cle(p);
+
+    var nom = document.createElement("span");
+    nom.className = "nom";
+    nom.textContent = p.nom;
+    ligne.appendChild(nom);
+
+    var choix = document.createElement("div");
+    choix.className = "choix";
+    choix.setAttribute("role", "group");
+    choix.setAttribute("aria-label", p.cat + " " + p.nom);
+    NIVEAUX.slice().reverse().forEach(function (n) {
+      var bouton = document.createElement("button");
+      bouton.type = "button";
+      bouton.dataset.n = n;
+      bouton.textContent = COURTS[n];
+      bouton.title = LIBELLES[n];
+      choix.appendChild(bouton);
+    });
+    ligne.appendChild(choix);
+
+    var note = document.createElement("input");
+    note.type = "text";
+    note.className = "note";
+    note.placeholder = "Note pour la commande (facultatif)";
+    note.value = p.note || "";
+    note.setAttribute("aria-label", "Note pour " + p.nom);
+    ligne.appendChild(note);
+
+    peindreLigne(ligne, p);
+    return ligne;
+  }
+
+  function peindreLigne(ligne, p) {
+    ligne.dataset.niveau = p.niveau || "";
+    ligne.hidden = !visible(p);
+    var boutons = ligne.querySelectorAll(".choix button");
+    for (var i = 0; i < boutons.length; i++) {
+      boutons[i].setAttribute("aria-pressed", boutons[i].dataset.n === p.niveau ? "true" : "false");
+    }
+    var note = ligne.querySelector(".note");
+    note.hidden = !(p.niveau === "rouge" || p.niveau === "orange");
+    note.disabled = lectureSeule;
+  }
+
+  function decompte() {
+    var d = { rouge: 0, orange: 0, vert: 0, "": 0 };
+    etat.produits.forEach(function (p) { d[p.niveau || ""] += 1; });
+    return d;
+  }
+
+  function niveauGeneral(d) {
+    for (var i = 0; i < NIVEAUX.length; i++) { if (d[NIVEAUX[i]]) return NIVEAUX[i]; }
+    return "";
+  }
+
+  function majEntete() {
+    var d = decompte();
+    var total = etat.produits.length;
+    var faits = total - d[""];
+    $("jauge").style.width = (total ? Math.round((faits / total) * 100) : 0) + "%";
+
+    var boite = $("compteurs");
+    boite.textContent = "";
+    boite.appendChild(puce("tout", "", "Tous", total));
+    if (d[""]) boite.appendChild(puce("afaire", "", "À faire", d[""]));
+    NIVEAUX.forEach(function (n) { boite.appendChild(puce(n, n, COURTS[n], d[n])); });
+
+    document.querySelectorAll(".reste").forEach(function (span) {
+      var restants = etat.produits.filter(function (p) {
+        return p.cat === span.dataset.cat && !p.niveau;
+      }).length;
+      span.textContent = restants ? " " + restants + " à faire" : "";
+    });
+
+    $("legende").textContent =
+      faits + " produit" + (faits > 1 ? "s" : "") + " sur " + total +
+      " vérifié" + (faits > 1 ? "s" : "") + " · niveau général : " +
+      LIBELLES[niveauGeneral(d)].toLowerCase() +
+      (etat.maj ? " · dernière modification " + moment(etat.maj) : "");
+
+    majCommande();
+  }
+
+  function puce(valeur, niveau, texte, nombre) {
+    var bouton = document.createElement("button");
+    bouton.type = "button";
+    bouton.className = "puce";
+    bouton.dataset.filtre = valeur;
+    bouton.dataset.niveau = niveau;
+    bouton.setAttribute("aria-pressed", filtre === valeur ? "true" : "false");
+    var pastille = document.createElement("span");
+    pastille.className = "pastille";
+    if (valeur !== "tout") bouton.appendChild(pastille);
+    bouton.appendChild(document.createTextNode(texte + " "));
+    var gras = document.createElement("b");
+    gras.textContent = String(nombre);
+    bouton.appendChild(gras);
+    return bouton;
+  }
+
+  function majCommande() {
+    var liste = $("commande");
+    liste.textContent = "";
+    var aCommander = etat.produits.filter(function (p) {
+      return p.niveau === "rouge" || p.niveau === "orange";
+    }).sort(function (a, b) {
+      if (a.niveau !== b.niveau) return a.niveau === "rouge" ? -1 : 1;
+      return (a.cat + a.nom).localeCompare(b.cat + b.nom, "fr");
+    });
+
+    aCommander.forEach(function (p) {
+      var li = document.createElement("li");
+      li.dataset.niveau = p.niveau;
+      var pastille = document.createElement("span");
+      pastille.className = "pastille";
+      li.appendChild(pastille);
+      var texte = document.createElement("span");
+      texte.textContent = p.nom + " ";
+      var cat = document.createElement("span");
+      cat.className = "cat";
+      cat.textContent = p.cat;
+      texte.appendChild(cat);
+      if (p.note) {
+        var rem = document.createElement("span");
+        rem.className = "rem";
+        rem.textContent = " — " + p.note;
+        texte.appendChild(rem);
+      }
+      li.appendChild(texte);
+      liste.appendChild(li);
+    });
+
+    $("commande-vide").hidden = aCommander.length > 0;
+  }
+
+  function moment(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return "";
+    return d.toLocaleString("fr-FR", {
+      weekday: "long", day: "numeric", month: "long",
+      hour: "2-digit", minute: "2-digit"
+    });
+  }
+
+  function appliquerFiltre() {
+    var index = {};
+    etat.produits.forEach(function (p) { index[cle(p)] = p; });
+    document.querySelectorAll(".ligne").forEach(function (ligne) {
+      var p = index[ligne.dataset.cle];
+      if (p) ligne.hidden = !visible(p);
+    });
+    document.querySelectorAll(".puce").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.dataset.filtre === filtre ? "true" : "false");
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Interactions                                                        */
+  /* ------------------------------------------------------------------ */
+
+  function produitDe(ligne) {
+    for (var i = 0; i < etat.produits.length; i++) {
+      if (cle(etat.produits[i]) === ligne.dataset.cle) return etat.produits[i];
+    }
+    return null;
+  }
+
+  document.getElementById("liste").addEventListener("click", function (evt) {
+    var bouton = evt.target.closest(".choix button");
+    if (!bouton || lectureSeule) return;
+    var ligne = bouton.closest(".ligne");
+    var p = produitDe(ligne);
+    if (!p) return;
+    p.niveau = p.niveau === bouton.dataset.n ? "" : bouton.dataset.n;
+    if (!p.niveau) p.note = "";
+    peindreLigne(ligne, p);
+    majEntete();
+    planifier();
+  });
+
+  document.getElementById("liste").addEventListener("input", function (evt) {
+    if (!evt.target.classList.contains("note") || lectureSeule) return;
+    var p = produitDe(evt.target.closest(".ligne"));
+    if (!p) return;
+    p.note = evt.target.value;
+    majCommande();
+    planifier();
+  });
+
+  document.getElementById("compteurs").addEventListener("click", function (evt) {
+    var bouton = evt.target.closest(".puce");
+    if (!bouton) return;
+    filtre = bouton.dataset.filtre;
+    appliquerFiltre();
+    memoriserVue();
+  });
+
+  document.getElementById("saut").addEventListener("change", function (evt) {
+    var id = evt.target.value;
+    if (!id) return;
+    var titre = document.getElementById(id);
+    if (titre) titre.scrollIntoView({ behavior: "smooth", block: "start" });
+    evt.target.value = "";
+  });
+
+  document.getElementById("reinitialiser").addEventListener("click", function () {
+    if (lectureSeule) return;
+    if (!window.confirm("Effacer tous les niveaux et repartir sur une semaine vierge ?")) return;
+    etat.produits.forEach(function (p) { p.niveau = ""; p.note = ""; });
+    etat.semaine = semaineCourante();
+    construireListe();
+    majEntete();
+    planifier(0);
+  });
+
+  document.getElementById("exporter").addEventListener("click", function () {
+    exporter();
+  });
+
+  function semaineCourante() {
+    var d = new Date();
+    var jeudi = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    jeudi.setUTCDate(jeudi.getUTCDate() + 4 - (jeudi.getUTCDay() || 7));
+    var debut = new Date(Date.UTC(jeudi.getUTCFullYear(), 0, 1));
+    var no = Math.ceil(((jeudi - debut) / 86400000 + 1) / 7);
+    return jeudi.getUTCFullYear() + "-S" + (no < 10 ? "0" + no : no);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Enregistrement                                                      */
+  /* ------------------------------------------------------------------ */
+
+  function statut(etatTexte, texte) {
+    var el = $("statut");
+    el.dataset.etat = etatTexte;
+    el.textContent = texte;
+  }
+
+  function planifier(delai) {
+    if (lectureSeule || !art) return;
+    etat.maj = new Date().toISOString();
+    statut("attente", "Modifications non enregistrées");
+    window.clearTimeout(minuteur);
+    minuteur = window.setTimeout(sauvegarder, delai === undefined ? delaiSauvegarde : delai);
+  }
+
+  function memoriserVue() {
+    try {
+      window.sessionStorage.setItem("bodyclub.vue", JSON.stringify({
+        filtre: filtre, y: window.scrollY
+      }));
+    } catch (e) { /* stockage indisponible : sans importance */ }
+  }
+
+  function restaurerVue() {
+    try {
+      var brut = window.sessionStorage.getItem("bodyclub.vue");
+      if (!brut) return;
+      var vue = JSON.parse(brut);
+      if (vue && typeof vue.filtre === "string") filtre = vue.filtre;
+      if (vue && typeof vue.y === "number") {
+        window.requestAnimationFrame(function () { window.scrollTo(0, vue.y); });
+      }
+    } catch (e) { /* stockage indisponible : sans importance */ }
+  }
+
+  // Les marqueurs sont assemblés au vol : écrits en toutes lettres, le
+  // script de construction les remplacerait ici aussi.
+  var MARQUE_ETAT = "__" + "ETAT__";
+  var MARQUE_MODELE = "__" + "MODELE__";
+
+  function documentComplet() {
+    var modele = document.getElementById("modele").textContent.split("<\\/").join("<\/");
+    return modele
+      .replace(MARQUE_ETAT, function () { return JSON.stringify(etat).split("<").join("\\u003c"); })
+      .replace(MARQUE_MODELE, function () { return modele.split("<\/").join("<\\/"); });
+  }
+
+  // L'état est réécrit dans la page elle-même — et non dans un fichier de
+  // données à côté — pour que le rapport du vendredi puisse le relire.
+  function sauvegarder() {
+    if (lectureSeule || !art) return;
+    statut("cours", "Enregistrement…");
+    memoriserVue();
+    art.publish(documentComplet()).then(function () {
+      reessaye = false;
+      statut("ok", "Enregistré");
+    }, gererErreur);
+  }
+
+  function gererErreur(err) {
+    var code = (err && err.code) || "upstream_error";
+    if (code === "conflict") {
+      statut("attente", "Un autre appareil a enregistré — actualisation…");
+      return;
+    }
+    if (code === "not_writer" || code === "not_granted" ||
+        code === "not_declared" || code === "consent_required") {
+      passerEnLectureSeule();
+      return;
+    }
+    if (code === "capability_disabled" || code === "capability_removed") {
+      passerEnLectureSeule();
+      return;
+    }
+    if (code === "rate_limited") {
+      delaiSauvegarde = 8000;
+      statut("attente", "Enregistrement différé…");
+      planifier(delaiSauvegarde);
+      return;
+    }
+    if (code === "upstream_error" && !reessaye) {
+      reessaye = true;
+      statut("attente", "Nouvelle tentative…");
+      window.setTimeout(sauvegarder, 1200 + Math.random() * 800);
+      return;
+    }
+    if (code === "too_large" || code === "invalid_content") {
+      statut("erreur", "Enregistrement refusé — prévenir le ou la responsable");
+      return;
+    }
+    statut("erreur", "Enregistrement impossible — réessayer plus tard");
+  }
+
+  function passerEnLectureSeule() {
+    lectureSeule = true;
+    statut("local", "Lecture seule");
+    var bandeau = $("bandeau-lecture");
+    bandeau.textContent = "Cette page est en lecture seule sur cet appareil : " +
+      "les niveaux choisis ici ne seront pas enregistrés. Demander un accès en " +
+      "écriture au ou à la responsable.";
+    bandeau.hidden = false;
+    $("reinitialiser").hidden = true;
+    document.querySelectorAll(".note").forEach(function (n) { n.disabled = true; });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Export CSV                                                          */
+  /* ------------------------------------------------------------------ */
+
+  function champCsv(valeur) {
+    var texte = String(valeur === undefined || valeur === null ? "" : valeur);
+    return /[",\n]/.test(texte) ? '"' + texte.split('"').join('""') + '"' : texte;
+  }
+
+  function exporter() {
+    var lignes = ["produit,categorie,niveau,remarque"];
+    etat.produits.forEach(function (p) {
+      lignes.push([p.nom, p.cat, p.niveau || "", p.note || ""].map(champCsv).join(","));
+    });
+    var contenu = lignes.join("\n") + "\n";
+    var nom = "releve-" + (etat.semaine || semaineCourante()) + ".csv";
+
+    if (!window.claude || !window.claude.use) { return; }
+    window.claude.use("downloads").then(function (dl) {
+      if (!dl) {
+        statut("erreur", "Export indisponible sur cet appareil");
+        return;
+      }
+      return dl.save({ filename: nom, data: contenu }).then(function () {
+        statut("ok", "Fichier enregistré");
+      }, function (err) {
+        if (err && err.code === "declined") return;
+        statut("erreur", "Export impossible");
+      });
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Démarrage                                                           */
+  /* ------------------------------------------------------------------ */
+
+  function bandeauVendredi() {
+    var maintenant = new Date();
+    var jour = maintenant.toLocaleDateString("fr-FR", {
+      weekday: "long", timeZone: "Europe/Paris"
+    });
+    if (jour !== "vendredi") return;
+    var bandeau = $("bandeau-vendredi");
+    bandeau.textContent = "C'est vendredi : le relevé part à 15h. " +
+      "Vérifier les produits restants avant l'envoi.";
+    bandeau.hidden = false;
+  }
+
+  restaurerVue();
+  construireListe();
+  majEntete();
+  appliquerFiltre();
+  bandeauVendredi();
+  statut("local", "Hors ligne");
+
+  if (window.claude && window.claude.use) {
+    window.claude.use("artifact").then(function (namespace) {
+      art = namespace;
+      statut(art ? "ok" : "local", art ? "Enregistré" : "Enregistrement indisponible");
+    }).catch(function () {
+      statut("local", "Enregistrement indisponible");
+    });
+  } else {
+    statut("local", "Enregistrement indisponible");
+  }
+})();
+<\/script>
+<\/body>
+<\/html>
+</script>
+<script>
+(function () {
+  "use strict";
+
+  var NIVEAUX = ["rouge", "orange", "vert"];
+  var LIBELLES = {
+    rouge: "Commande urgente",
+    orange: "Stock bas",
+    vert: "Stock suffisant",
+    "": "Pas encore vérifié"
+  };
+  var COURTS = { rouge: "Rouge", orange: "Orange", vert: "Vert" };
+
+  var etat = JSON.parse(document.getElementById("etat").textContent);
+  var art = null;
+  var lectureSeule = false;
+  var minuteur = null;
+  var delaiSauvegarde = 2000;
+  var reessaye = false;
+  var filtre = "tout";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var cle = function (p) { return p.cat + " \u203a " + p.nom; };
+
+  /* ------------------------------------------------------------------ */
+  /* Rendu                                                               */
+  /* ------------------------------------------------------------------ */
+
+  function categories() {
+    var ordre = [];
+    var index = {};
+    etat.produits.forEach(function (p) {
+      if (!index[p.cat]) { index[p.cat] = []; ordre.push(p.cat); }
+      index[p.cat].push(p);
+    });
+    return ordre.map(function (c) { return { nom: c, produits: index[c] }; });
+  }
+
+  function visible(p) {
+    if (filtre === "tout") return true;
+    if (filtre === "afaire") return !p.niveau;
+    return p.niveau === filtre;
+  }
+
+  function construireListe() {
+    var liste = $("liste");
+    liste.textContent = "";
+    var saut = $("saut");
+    saut.textContent = "";
+    saut.appendChild(new Option("Aller à une catégorie…", ""));
+
+    categories().forEach(function (groupe, i) {
+      var id = "cat-" + i;
+      var titre = document.createElement("h2");
+      titre.id = id;
+      titre.appendChild(document.createTextNode(groupe.nom));
+      var reste = document.createElement("span");
+      reste.className = "reste";
+      reste.dataset.cat = groupe.nom;
+      titre.appendChild(reste);
+      liste.appendChild(titre);
+
+      var bloc = document.createElement("div");
+      bloc.className = "groupe";
+      groupe.produits.forEach(function (p) { bloc.appendChild(construireLigne(p)); });
+      liste.appendChild(bloc);
+
+      saut.appendChild(new Option(groupe.nom + " (" + groupe.produits.length + ")", id));
+    });
+  }
+
+  function construireLigne(p) {
+    var ligne = document.createElement("div");
+    ligne.className = "ligne";
+    ligne.dataset.cle = cle(p);
+
+    var nom = document.createElement("span");
+    nom.className = "nom";
+    nom.textContent = p.nom;
+    ligne.appendChild(nom);
+
+    var choix = document.createElement("div");
+    choix.className = "choix";
+    choix.setAttribute("role", "group");
+    choix.setAttribute("aria-label", p.cat + " " + p.nom);
+    NIVEAUX.slice().reverse().forEach(function (n) {
+      var bouton = document.createElement("button");
+      bouton.type = "button";
+      bouton.dataset.n = n;
+      bouton.textContent = COURTS[n];
+      bouton.title = LIBELLES[n];
+      choix.appendChild(bouton);
+    });
+    ligne.appendChild(choix);
+
+    var note = document.createElement("input");
+    note.type = "text";
+    note.className = "note";
+    note.placeholder = "Note pour la commande (facultatif)";
+    note.value = p.note || "";
+    note.setAttribute("aria-label", "Note pour " + p.nom);
+    ligne.appendChild(note);
+
+    peindreLigne(ligne, p);
+    return ligne;
+  }
+
+  function peindreLigne(ligne, p) {
+    ligne.dataset.niveau = p.niveau || "";
+    ligne.hidden = !visible(p);
+    var boutons = ligne.querySelectorAll(".choix button");
+    for (var i = 0; i < boutons.length; i++) {
+      boutons[i].setAttribute("aria-pressed", boutons[i].dataset.n === p.niveau ? "true" : "false");
+    }
+    var note = ligne.querySelector(".note");
+    note.hidden = !(p.niveau === "rouge" || p.niveau === "orange");
+    note.disabled = lectureSeule;
+  }
+
+  function decompte() {
+    var d = { rouge: 0, orange: 0, vert: 0, "": 0 };
+    etat.produits.forEach(function (p) { d[p.niveau || ""] += 1; });
+    return d;
+  }
+
+  function niveauGeneral(d) {
+    for (var i = 0; i < NIVEAUX.length; i++) { if (d[NIVEAUX[i]]) return NIVEAUX[i]; }
+    return "";
+  }
+
+  function majEntete() {
+    var d = decompte();
+    var total = etat.produits.length;
+    var faits = total - d[""];
+    $("jauge").style.width = (total ? Math.round((faits / total) * 100) : 0) + "%";
+
+    var boite = $("compteurs");
+    boite.textContent = "";
+    boite.appendChild(puce("tout", "", "Tous", total));
+    if (d[""]) boite.appendChild(puce("afaire", "", "À faire", d[""]));
+    NIVEAUX.forEach(function (n) { boite.appendChild(puce(n, n, COURTS[n], d[n])); });
+
+    document.querySelectorAll(".reste").forEach(function (span) {
+      var restants = etat.produits.filter(function (p) {
+        return p.cat === span.dataset.cat && !p.niveau;
+      }).length;
+      span.textContent = restants ? " " + restants + " à faire" : "";
+    });
+
+    $("legende").textContent =
+      faits + " produit" + (faits > 1 ? "s" : "") + " sur " + total +
+      " vérifié" + (faits > 1 ? "s" : "") + " · niveau général : " +
+      LIBELLES[niveauGeneral(d)].toLowerCase() +
+      (etat.maj ? " · dernière modification " + moment(etat.maj) : "");
+
+    majCommande();
+  }
+
+  function puce(valeur, niveau, texte, nombre) {
+    var bouton = document.createElement("button");
+    bouton.type = "button";
+    bouton.className = "puce";
+    bouton.dataset.filtre = valeur;
+    bouton.dataset.niveau = niveau;
+    bouton.setAttribute("aria-pressed", filtre === valeur ? "true" : "false");
+    var pastille = document.createElement("span");
+    pastille.className = "pastille";
+    if (valeur !== "tout") bouton.appendChild(pastille);
+    bouton.appendChild(document.createTextNode(texte + " "));
+    var gras = document.createElement("b");
+    gras.textContent = String(nombre);
+    bouton.appendChild(gras);
+    return bouton;
+  }
+
+  function majCommande() {
+    var liste = $("commande");
+    liste.textContent = "";
+    var aCommander = etat.produits.filter(function (p) {
+      return p.niveau === "rouge" || p.niveau === "orange";
+    }).sort(function (a, b) {
+      if (a.niveau !== b.niveau) return a.niveau === "rouge" ? -1 : 1;
+      return (a.cat + a.nom).localeCompare(b.cat + b.nom, "fr");
+    });
+
+    aCommander.forEach(function (p) {
+      var li = document.createElement("li");
+      li.dataset.niveau = p.niveau;
+      var pastille = document.createElement("span");
+      pastille.className = "pastille";
+      li.appendChild(pastille);
+      var texte = document.createElement("span");
+      texte.textContent = p.nom + " ";
+      var cat = document.createElement("span");
+      cat.className = "cat";
+      cat.textContent = p.cat;
+      texte.appendChild(cat);
+      if (p.note) {
+        var rem = document.createElement("span");
+        rem.className = "rem";
+        rem.textContent = " — " + p.note;
+        texte.appendChild(rem);
+      }
+      li.appendChild(texte);
+      liste.appendChild(li);
+    });
+
+    $("commande-vide").hidden = aCommander.length > 0;
+  }
+
+  function moment(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return "";
+    return d.toLocaleString("fr-FR", {
+      weekday: "long", day: "numeric", month: "long",
+      hour: "2-digit", minute: "2-digit"
+    });
+  }
+
+  function appliquerFiltre() {
+    var index = {};
+    etat.produits.forEach(function (p) { index[cle(p)] = p; });
+    document.querySelectorAll(".ligne").forEach(function (ligne) {
+      var p = index[ligne.dataset.cle];
+      if (p) ligne.hidden = !visible(p);
+    });
+    document.querySelectorAll(".puce").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.dataset.filtre === filtre ? "true" : "false");
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Interactions                                                        */
+  /* ------------------------------------------------------------------ */
+
+  function produitDe(ligne) {
+    for (var i = 0; i < etat.produits.length; i++) {
+      if (cle(etat.produits[i]) === ligne.dataset.cle) return etat.produits[i];
+    }
+    return null;
+  }
+
+  document.getElementById("liste").addEventListener("click", function (evt) {
+    var bouton = evt.target.closest(".choix button");
+    if (!bouton || lectureSeule) return;
+    var ligne = bouton.closest(".ligne");
+    var p = produitDe(ligne);
+    if (!p) return;
+    p.niveau = p.niveau === bouton.dataset.n ? "" : bouton.dataset.n;
+    if (!p.niveau) p.note = "";
+    peindreLigne(ligne, p);
+    majEntete();
+    planifier();
+  });
+
+  document.getElementById("liste").addEventListener("input", function (evt) {
+    if (!evt.target.classList.contains("note") || lectureSeule) return;
+    var p = produitDe(evt.target.closest(".ligne"));
+    if (!p) return;
+    p.note = evt.target.value;
+    majCommande();
+    planifier();
+  });
+
+  document.getElementById("compteurs").addEventListener("click", function (evt) {
+    var bouton = evt.target.closest(".puce");
+    if (!bouton) return;
+    filtre = bouton.dataset.filtre;
+    appliquerFiltre();
+    memoriserVue();
+  });
+
+  document.getElementById("saut").addEventListener("change", function (evt) {
+    var id = evt.target.value;
+    if (!id) return;
+    var titre = document.getElementById(id);
+    if (titre) titre.scrollIntoView({ behavior: "smooth", block: "start" });
+    evt.target.value = "";
+  });
+
+  document.getElementById("reinitialiser").addEventListener("click", function () {
+    if (lectureSeule) return;
+    if (!window.confirm("Effacer tous les niveaux et repartir sur une semaine vierge ?")) return;
+    etat.produits.forEach(function (p) { p.niveau = ""; p.note = ""; });
+    etat.semaine = semaineCourante();
+    construireListe();
+    majEntete();
+    planifier(0);
+  });
+
+  document.getElementById("exporter").addEventListener("click", function () {
+    exporter();
+  });
+
+  function semaineCourante() {
+    var d = new Date();
+    var jeudi = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    jeudi.setUTCDate(jeudi.getUTCDate() + 4 - (jeudi.getUTCDay() || 7));
+    var debut = new Date(Date.UTC(jeudi.getUTCFullYear(), 0, 1));
+    var no = Math.ceil(((jeudi - debut) / 86400000 + 1) / 7);
+    return jeudi.getUTCFullYear() + "-S" + (no < 10 ? "0" + no : no);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Enregistrement                                                      */
+  /* ------------------------------------------------------------------ */
+
+  function statut(etatTexte, texte) {
+    var el = $("statut");
+    el.dataset.etat = etatTexte;
+    el.textContent = texte;
+  }
+
+  function planifier(delai) {
+    if (lectureSeule || !art) return;
+    etat.maj = new Date().toISOString();
+    statut("attente", "Modifications non enregistrées");
+    window.clearTimeout(minuteur);
+    minuteur = window.setTimeout(sauvegarder, delai === undefined ? delaiSauvegarde : delai);
+  }
+
+  function memoriserVue() {
+    try {
+      window.sessionStorage.setItem("bodyclub.vue", JSON.stringify({
+        filtre: filtre, y: window.scrollY
+      }));
+    } catch (e) { /* stockage indisponible : sans importance */ }
+  }
+
+  function restaurerVue() {
+    try {
+      var brut = window.sessionStorage.getItem("bodyclub.vue");
+      if (!brut) return;
+      var vue = JSON.parse(brut);
+      if (vue && typeof vue.filtre === "string") filtre = vue.filtre;
+      if (vue && typeof vue.y === "number") {
+        window.requestAnimationFrame(function () { window.scrollTo(0, vue.y); });
+      }
+    } catch (e) { /* stockage indisponible : sans importance */ }
+  }
+
+  // Les marqueurs sont assemblés au vol : écrits en toutes lettres, le
+  // script de construction les remplacerait ici aussi.
+  var MARQUE_ETAT = "__" + "ETAT__";
+  var MARQUE_MODELE = "__" + "MODELE__";
+
+  function documentComplet() {
+    var modele = document.getElementById("modele").textContent.split("<\\/").join("</");
+    return modele
+      .replace(MARQUE_ETAT, function () { return JSON.stringify(etat).split("<").join("\\u003c"); })
+      .replace(MARQUE_MODELE, function () { return modele.split("</").join("<\\/"); });
+  }
+
+  // L'état est réécrit dans la page elle-même — et non dans un fichier de
+  // données à côté — pour que le rapport du vendredi puisse le relire.
+  function sauvegarder() {
+    if (lectureSeule || !art) return;
+    statut("cours", "Enregistrement…");
+    memoriserVue();
+    art.publish(documentComplet()).then(function () {
+      reessaye = false;
+      statut("ok", "Enregistré");
+    }, gererErreur);
+  }
+
+  function gererErreur(err) {
+    var code = (err && err.code) || "upstream_error";
+    if (code === "conflict") {
+      statut("attente", "Un autre appareil a enregistré — actualisation…");
+      return;
+    }
+    if (code === "not_writer" || code === "not_granted" ||
+        code === "not_declared" || code === "consent_required") {
+      passerEnLectureSeule();
+      return;
+    }
+    if (code === "capability_disabled" || code === "capability_removed") {
+      passerEnLectureSeule();
+      return;
+    }
+    if (code === "rate_limited") {
+      delaiSauvegarde = 8000;
+      statut("attente", "Enregistrement différé…");
+      planifier(delaiSauvegarde);
+      return;
+    }
+    if (code === "upstream_error" && !reessaye) {
+      reessaye = true;
+      statut("attente", "Nouvelle tentative…");
+      window.setTimeout(sauvegarder, 1200 + Math.random() * 800);
+      return;
+    }
+    if (code === "too_large" || code === "invalid_content") {
+      statut("erreur", "Enregistrement refusé — prévenir le ou la responsable");
+      return;
+    }
+    statut("erreur", "Enregistrement impossible — réessayer plus tard");
+  }
+
+  function passerEnLectureSeule() {
+    lectureSeule = true;
+    statut("local", "Lecture seule");
+    var bandeau = $("bandeau-lecture");
+    bandeau.textContent = "Cette page est en lecture seule sur cet appareil : " +
+      "les niveaux choisis ici ne seront pas enregistrés. Demander un accès en " +
+      "écriture au ou à la responsable.";
+    bandeau.hidden = false;
+    $("reinitialiser").hidden = true;
+    document.querySelectorAll(".note").forEach(function (n) { n.disabled = true; });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Export CSV                                                          */
+  /* ------------------------------------------------------------------ */
+
+  function champCsv(valeur) {
+    var texte = String(valeur === undefined || valeur === null ? "" : valeur);
+    return /[",\n]/.test(texte) ? '"' + texte.split('"').join('""') + '"' : texte;
+  }
+
+  function exporter() {
+    var lignes = ["produit,categorie,niveau,remarque"];
+    etat.produits.forEach(function (p) {
+      lignes.push([p.nom, p.cat, p.niveau || "", p.note || ""].map(champCsv).join(","));
+    });
+    var contenu = lignes.join("\n") + "\n";
+    var nom = "releve-" + (etat.semaine || semaineCourante()) + ".csv";
+
+    if (!window.claude || !window.claude.use) { return; }
+    window.claude.use("downloads").then(function (dl) {
+      if (!dl) {
+        statut("erreur", "Export indisponible sur cet appareil");
+        return;
+      }
+      return dl.save({ filename: nom, data: contenu }).then(function () {
+        statut("ok", "Fichier enregistré");
+      }, function (err) {
+        if (err && err.code === "declined") return;
+        statut("erreur", "Export impossible");
+      });
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Démarrage                                                           */
+  /* ------------------------------------------------------------------ */
+
+  function bandeauVendredi() {
+    var maintenant = new Date();
+    var jour = maintenant.toLocaleDateString("fr-FR", {
+      weekday: "long", timeZone: "Europe/Paris"
+    });
+    if (jour !== "vendredi") return;
+    var bandeau = $("bandeau-vendredi");
+    bandeau.textContent = "C'est vendredi : le relevé part à 15h. " +
+      "Vérifier les produits restants avant l'envoi.";
+    bandeau.hidden = false;
+  }
+
+  restaurerVue();
+  construireListe();
+  majEntete();
+  appliquerFiltre();
+  bandeauVendredi();
+  statut("local", "Hors ligne");
+
+  if (window.claude && window.claude.use) {
+    window.claude.use("artifact").then(function (namespace) {
+      art = namespace;
+      statut(art ? "ok" : "local", art ? "Enregistré" : "Enregistrement indisponible");
+    }).catch(function () {
+      statut("local", "Enregistrement indisponible");
+    });
+  } else {
+    statut("local", "Enregistrement indisponible");
+  }
+})();
+</script>
