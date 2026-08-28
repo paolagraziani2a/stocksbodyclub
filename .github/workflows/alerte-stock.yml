@@ -1,0 +1,77 @@
+name: Alerte stock du vendredi
+
+on:
+  schedule:
+    # GitHub planifie en UTC. 15h à Paris = 13h UTC en été (UTC+2)
+    # et 14h UTC en hiver (UTC+1) : on déclenche aux deux heures et
+    # l'étape « Vérifier l'heure de Paris » annule le déclenchement en trop.
+    - cron: '0 13 * * 5'
+    - cron: '0 14 * * 5'
+  workflow_dispatch:
+    inputs:
+      forcer:
+        description: "Lancer l'alerte même si ce n'est pas vendredi 15h"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  alerte:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vérifier l'heure de Paris
+        id: heure
+        run: |
+          jour=$(TZ=Europe/Paris date +%u)   # 5 = vendredi
+          heure=$(TZ=Europe/Paris date +%H)
+          if [ "${{ inputs.forcer }}" = "true" ] || { [ "$jour" = "5" ] && [ "$heure" = "15" ]; }; then
+            echo "lancer=oui" >> "$GITHUB_OUTPUT"
+          else
+            echo "Il n'est pas vendredi 15h à Paris (jour=$jour, heure=$heure) : on ne fait rien."
+            echo "lancer=non" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Générer l'alerte
+        if: steps.heure.outputs.lancer == 'oui'
+        id: alerte
+        run: |
+          # --code-sortie renvoie 2 (rouge), 1 (orange), 0 (vert) ou 3 (erreur).
+          code=0
+          python3 alerte_stock.py --format markdown --sortie alerte.md --code-sortie || code=$?
+          if [ "$code" = "3" ]; then
+            echo "::error::L'inventaire n'a pas pu être lu : corrigez inventaire.csv."
+            exit 1
+          fi
+          echo "niveau=$code" >> "$GITHUB_OUTPUT"
+          python3 alerte_stock.py --format html --sortie alerte.html
+          cat alerte.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publier le rapport imprimable
+        if: steps.heure.outputs.lancer == 'oui'
+        uses: actions/upload-artifact@v4
+        with:
+          name: alerte-stock
+          path: |
+            alerte.md
+            alerte.html
+          retention-days: 30
+
+      # Une issue n'est ouverte que s'il y a quelque chose à commander
+      # (niveau 1 = orange, 2 = rouge) : pas de bruit les semaines tout-vert.
+      - name: Ouvrir l'issue de commande
+        if: steps.heure.outputs.lancer == 'oui' && steps.alerte.outputs.niveau != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NIVEAU: ${{ steps.alerte.outputs.niveau }}
+        run: |
+          if [ "$NIVEAU" = "2" ]; then
+            titre="🔴 Commande urgente — $(TZ=Europe/Paris date '+%d/%m/%Y')"
+          else
+            titre="🟠 Stock bas — $(TZ=Europe/Paris date '+%d/%m/%Y')"
+          fi
+          gh issue create --title "$titre" --body-file alerte.md

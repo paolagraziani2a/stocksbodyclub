@@ -1,0 +1,16 @@
+produit,categorie,unite,quantite,seuil_bas,seuil_urgent,fournisseur
+Café en grains arabica,Boissons,kg,8,10,4,Torréfaction Belleville
+Café en grains décaféiné,Boissons,kg,2,3,1,Torréfaction Belleville
+Lait entier,Boissons,L,18,24,10,Metro
+Lait d'avoine,Boissons,L,6,12,5,Metro
+Sirop vanille,Boissons,bouteille,3,4,2,Monin
+Thé vert sencha,Boissons,boîte,5,3,1,Dammann
+Jus d'orange,Boissons,L,9,10,4,Metro
+Croissants surgelés,Snacking,pièce,120,80,40,Bridor
+Cookies emballés,Snacking,pièce,35,40,15,Bridor
+Sucre en morceaux,Épicerie,kg,12,6,3,Metro
+Gobelets 25 cl,Consommables,pièce,900,500,200,Firplast
+Couvercles 25 cl,Consommables,pièce,180,500,200,Firplast
+Serviettes papier,Consommables,paquet,14,10,4,Firplast
+Liquide vaisselle,Entretien,L,5,4,2,Metro
+Sacs poubelle 50 L,Entretien,rouleau,2,3,1,Metro
