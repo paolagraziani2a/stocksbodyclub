@@ -13,10 +13,10 @@ import alerte_stock as app  # noqa: E402
 EN_TETES = "produit,categorie,unite,quantite,seuil_bas,seuil_urgent,fournisseur\n"
 
 
-def produit(quantite, seuil_bas=10, seuil_urgent=4, nom="Café"):
+def produit(quantite, seuil_bas=10, seuil_urgent=4, nom="Café grains", categorie="Alimentaire"):
     return app.Produit(
         nom=nom,
-        categorie="Boissons",
+        categorie=categorie,
         unite="kg",
         quantite=quantite,
         seuil_bas=seuil_bas,
@@ -57,43 +57,107 @@ class TestNiveaux(unittest.TestCase):
         self.assertEqual(produit(20).manque, 0)
 
 
+class TestProduitsNonRenseignes(unittest.TestCase):
+    """Un produit incomplet ne doit jamais passer pour vert."""
+
+    def test_sans_quantite(self):
+        self.assertEqual(produit(None).niveau, app.INCONNU)
+
+    def test_sans_seuils(self):
+        self.assertEqual(
+            produit(12, seuil_bas=None, seuil_urgent=None).niveau, app.INCONNU
+        )
+
+    def test_sans_seuil_urgent_seulement(self):
+        self.assertEqual(produit(12, seuil_urgent=None).niveau, app.INCONNU)
+
+    def test_manque_nul_si_incomplet(self):
+        self.assertEqual(produit(None).manque, 0)
+
+    def test_raison_a_compter(self):
+        self.assertEqual(produit(None, seuil_bas=10).raison_inconnu(), "à compter")
+
+    def test_raison_seuils_a_definir(self):
+        self.assertEqual(
+            produit(12, seuil_bas=None, seuil_urgent=None).raison_inconnu(),
+            "seuils à définir",
+        )
+
+    def test_quantite_lisible_sans_quantite(self):
+        self.assertEqual(produit(None).quantite_lisible(), "—")
+
+
 class TestNiveauGlobal(unittest.TestCase):
     def test_rouge_prime_sur_orange(self):
-        groupes = app.grouper([produit(2), produit(5, nom="Lait"), produit(50, nom="Thé")])
+        groupes = app.grouper(
+            [produit(2), produit(5, nom="Sucre"), produit(50, nom="Granola")]
+        )
         self.assertEqual(app.niveau_global(groupes), app.ROUGE)
 
     def test_orange_prime_sur_vert(self):
-        groupes = app.grouper([produit(5), produit(50, nom="Thé")])
+        groupes = app.grouper([produit(5), produit(50, nom="Granola")])
         self.assertEqual(app.niveau_global(groupes), app.ORANGE)
 
     def test_vert_si_tout_va_bien(self):
         self.assertEqual(app.niveau_global(app.grouper([produit(50)])), app.VERT)
 
+    def test_les_inconnus_ne_font_pas_le_niveau_general(self):
+        groupes = app.grouper([produit(50), produit(None, nom="Sucre")])
+        self.assertEqual(app.niveau_global(groupes), app.VERT)
+
+    def test_inconnu_si_rien_n_est_renseigne(self):
+        self.assertEqual(app.niveau_global(app.grouper([produit(None)])), app.INCONNU)
+
     def test_tri_du_plus_manquant_au_moins_manquant(self):
-        groupes = app.grouper([produit(9, nom="Sucre"), produit(1, nom="Lait")])
+        groupes = app.grouper([produit(9, nom="Sucre"), produit(1, nom="Granola")])
         self.assertEqual([p.nom for p in groupes[app.ORANGE]], ["Sucre"])
-        self.assertEqual([p.nom for p in groupes[app.ROUGE]], ["Lait"])
+        self.assertEqual([p.nom for p in groupes[app.ROUGE]], ["Granola"])
 
 
 class TestLectureInventaire(unittest.TestCase):
     def test_lecture_nominale(self):
-        chemin = csv_temporaire("Lait,Boissons,L,18,24,10,Metro\n")
+        chemin = csv_temporaire("Lait avoine,Laits & frais,L,18,24,10,Metro\n")
         produits = app.lire_inventaire(chemin)
         self.assertEqual(len(produits), 1)
-        self.assertEqual(produits[0].nom, "Lait")
+        self.assertEqual(produits[0].nom, "Lait avoine")
         self.assertEqual(produits[0].niveau, app.ORANGE)
 
+    def test_cellules_vides_acceptees(self):
+        chemin = csv_temporaire("Cannelle,Alimentaire,pot,,,,\n")
+        lu = app.lire_inventaire(chemin)[0]
+        self.assertIsNone(lu.quantite)
+        self.assertEqual(lu.niveau, app.INCONNU)
+        self.assertEqual(lu.fournisseur, "—")
+
     def test_virgule_decimale_acceptee(self):
-        chemin = csv_temporaire("Lait,Boissons,L,\"2,5\",4,2,Metro\n")
+        chemin = csv_temporaire('Lait coco,Laits & frais,L,"2,5",4,2,Metro\n')
         self.assertEqual(app.lire_inventaire(chemin)[0].quantite, 2.5)
 
-    def test_lignes_vides_ignorees(self):
-        chemin = csv_temporaire("Lait,Boissons,L,18,24,10,Metro\n,,,,,,\n")
-        self.assertEqual(len(app.lire_inventaire(chemin)), 1)
+    def test_virgule_dans_le_nom_du_produit(self):
+        chemin = csv_temporaire('"Zilia 1,5 L",Eaux,bouteille,6,4,2,Metro\n')
+        self.assertEqual(app.lire_inventaire(chemin)[0].nom, "Zilia 1,5 L")
 
-    def test_inventaire_reel_du_depot(self):
-        produits = app.lire_inventaire(Path(app.__file__).with_name("inventaire.csv"))
-        self.assertGreater(len(produits), 0)
+    def test_meme_nom_dans_deux_categories(self):
+        chemin = csv_temporaire(
+            "Framboise,Sirops Monin,bouteille,6,4,2,Monin\n"
+            "Framboise,Sauces sucrées,bouteille,1,4,2,Monin\n"
+        )
+        produits = app.lire_inventaire(chemin)
+        self.assertEqual(len(produits), 2)
+        self.assertEqual(produits[0].niveau, app.VERT)
+        self.assertEqual(produits[1].niveau, app.ROUGE)
+
+    def test_doublon_dans_la_meme_categorie(self):
+        chemin = csv_temporaire(
+            "Framboise,Sirops Monin,bouteille,6,4,2,Monin\n"
+            "framboise,Sirops Monin,bouteille,1,4,2,Monin\n"
+        )
+        with self.assertRaisesRegex(app.ErreurInventaire, "déjà présent"):
+            app.lire_inventaire(chemin)
+
+    def test_lignes_vides_ignorees(self):
+        chemin = csv_temporaire("Lait avoine,Laits & frais,L,18,24,10,Metro\n,,,,,,\n")
+        self.assertEqual(len(app.lire_inventaire(chemin)), 1)
 
     def test_fichier_absent(self):
         with self.assertRaisesRegex(app.ErreurInventaire, "introuvable"):
@@ -101,22 +165,22 @@ class TestLectureInventaire(unittest.TestCase):
 
     def test_colonne_manquante(self):
         chemin = Path(tempfile.mkdtemp()) / "i.csv"
-        chemin.write_text("produit,quantite\nLait,3\n", encoding="utf-8")
+        chemin.write_text("produit,quantite\nSucre,3\n", encoding="utf-8")
         with self.assertRaisesRegex(app.ErreurInventaire, "colonnes manquantes"):
             app.lire_inventaire(chemin)
 
     def test_quantite_non_numerique(self):
-        chemin = csv_temporaire("Lait,Boissons,L,beaucoup,24,10,Metro\n")
+        chemin = csv_temporaire("Sucre,Alimentaire,kg,beaucoup,24,10,Metro\n")
         with self.assertRaisesRegex(app.ErreurInventaire, "n'est pas un nombre"):
             app.lire_inventaire(chemin)
 
     def test_quantite_negative(self):
-        chemin = csv_temporaire("Lait,Boissons,L,-2,24,10,Metro\n")
+        chemin = csv_temporaire("Sucre,Alimentaire,kg,-2,24,10,Metro\n")
         with self.assertRaisesRegex(app.ErreurInventaire, "négative"):
             app.lire_inventaire(chemin)
 
     def test_seuils_incoherents(self):
-        chemin = csv_temporaire("Lait,Boissons,L,18,4,10,Metro\n")
+        chemin = csv_temporaire("Sucre,Alimentaire,kg,18,4,10,Metro\n")
         with self.assertRaisesRegex(app.ErreurInventaire, "inférieur ou égal"):
             app.lire_inventaire(chemin)
 
@@ -126,24 +190,71 @@ class TestLectureInventaire(unittest.TestCase):
             app.lire_inventaire(chemin)
 
 
+class TestInventaireDuBodyClub(unittest.TestCase):
+    """Garde-fou sur le vrai fichier livré avec le dépôt."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.produits = app.lire_inventaire(
+            Path(app.__file__).with_name("inventaire.csv")
+        )
+
+    def test_140_references(self):
+        self.assertEqual(len(self.produits), 140)
+
+    def test_13_categories(self):
+        self.assertEqual(len(app.par_categorie(self.produits)), 13)
+
+    def test_effectif_par_categorie(self):
+        attendu = {
+            "Alimentaire": 29,
+            "Laits & frais": 6,
+            "Sauces cuisine": 3,
+            "Symples": 3,
+            "Boissons": 14,
+            "Sirops Monin": 15,
+            "Sauces sucrées": 7,
+            "Maya": 5,
+            "Eaux": 3,
+            "Étiquettes": 17,
+            "Emballages / consommables": 17,
+            "Ménager": 19,
+            "Divers": 2,
+        }
+        reel = {c: len(p) for c, p in app.par_categorie(self.produits).items()}
+        self.assertEqual(reel, attendu)
+
+    def test_chaque_produit_a_une_unite(self):
+        self.assertTrue(all(p.unite for p in self.produits))
+
+
 class TestRendus(unittest.TestCase):
     def setUp(self):
-        self.groupes = app.grouper(
-            [produit(2, nom="Lait"), produit(5, nom="Sucre"), produit(50, nom="Thé")]
-        )
+        self.produits = [
+            produit(2, nom="Lait avoine", categorie="Laits & frais"),
+            produit(5, nom="Sucre"),
+            produit(50, nom="Granola"),
+            produit(None, nom="Cannelle"),
+        ]
+        self.groupes = app.grouper(self.produits)
         self.moment = datetime(2026, 8, 28, 15, 0, tzinfo=app.FUSEAU)
 
     def test_texte_sans_couleur(self):
         rapport = app.rendu_texte(self.groupes, self.moment, couleur=False)
         self.assertNotIn("\033[", rapport)
         self.assertIn("vendredi 28 août 2026, 15h00", rapport)
-        self.assertIn("Lait", rapport)
+        self.assertIn("Laits & frais › Lait avoine", rapport)
 
     def test_texte_avec_couleur(self):
         rapport = app.rendu_texte(self.groupes, self.moment, couleur=True)
         self.assertIn(app.ANSI[app.ROUGE], rapport)
 
-    def test_markdown_liste_les_trois_niveaux(self):
+    def test_texte_signale_les_non_renseignes(self):
+        rapport = app.rendu_texte(self.groupes, self.moment, couleur=False)
+        self.assertIn("Cannelle", rapport)
+        self.assertIn("pas encore renseigné", rapport)
+
+    def test_markdown_liste_les_quatre_niveaux(self):
         rapport = app.rendu_markdown(self.groupes, self.moment)
         for niveau in app.NIVEAUX:
             self.assertIn(app.LIBELLES[niveau], rapport)
@@ -153,6 +264,12 @@ class TestRendus(unittest.TestCase):
         rapport = app.rendu_html(groupes, self.moment)
         self.assertIn("Sirop &lt;caramel&gt;", rapport)
         self.assertNotIn("<caramel>", rapport)
+
+    def test_feuille_de_comptage(self):
+        feuille = app.rendu_feuille(self.produits, self.moment)
+        self.assertIn("Feuille de comptage", feuille)
+        self.assertIn("Laits &amp; frais", feuille)
+        self.assertEqual(feuille.count("☐"), len(self.produits))
 
     def test_format_nombre(self):
         self.assertEqual(app.format_nombre(23.0), "23")
@@ -166,24 +283,29 @@ class TestLigneDeCommande(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Alerte stock", sortie.read_text(encoding="utf-8"))
 
+    def test_feuille_de_comptage_en_ligne_de_commande(self):
+        sortie = Path(tempfile.mkdtemp()) / "comptage.html"
+        self.assertEqual(app.main(["--format", "feuille", "--sortie", str(sortie)]), 0)
+        self.assertIn("Feuille de comptage", sortie.read_text(encoding="utf-8"))
+
     def test_code_sortie_rouge(self):
-        chemin = csv_temporaire("Lait,Boissons,L,1,24,10,Metro\n")
-        code = app.main(["--inventaire", str(chemin), "--code-sortie"])
-        self.assertEqual(code, 2)
+        chemin = csv_temporaire("Lait avoine,Laits & frais,L,1,24,10,Metro\n")
+        self.assertEqual(app.main(["--inventaire", str(chemin), "--code-sortie"]), 2)
 
     def test_code_sortie_orange(self):
-        chemin = csv_temporaire("Lait,Boissons,L,18,24,10,Metro\n")
-        code = app.main(["--inventaire", str(chemin), "--code-sortie"])
-        self.assertEqual(code, 1)
+        chemin = csv_temporaire("Lait avoine,Laits & frais,L,18,24,10,Metro\n")
+        self.assertEqual(app.main(["--inventaire", str(chemin), "--code-sortie"]), 1)
 
     def test_code_sortie_vert(self):
-        chemin = csv_temporaire("Lait,Boissons,L,40,24,10,Metro\n")
-        code = app.main(["--inventaire", str(chemin), "--code-sortie"])
-        self.assertEqual(code, 0)
+        chemin = csv_temporaire("Lait avoine,Laits & frais,L,40,24,10,Metro\n")
+        self.assertEqual(app.main(["--inventaire", str(chemin), "--code-sortie"]), 0)
+
+    def test_code_sortie_inconnu_ne_declenche_pas_de_commande(self):
+        chemin = csv_temporaire("Cannelle,Alimentaire,pot,,,,\n")
+        self.assertEqual(app.main(["--inventaire", str(chemin), "--code-sortie"]), 0)
 
     def test_erreur_inventaire(self):
-        code = app.main(["--inventaire", "/introuvable.csv"])
-        self.assertEqual(code, 3)
+        self.assertEqual(app.main(["--inventaire", "/introuvable.csv"]), 3)
 
 
 if __name__ == "__main__":

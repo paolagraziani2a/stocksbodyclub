@@ -49,6 +49,7 @@ jobs:
           fi
           echo "niveau=$code" >> "$GITHUB_OUTPUT"
           python3 alerte_stock.py --format html --sortie alerte.html
+          python3 alerte_stock.py --format feuille --sortie comptage.html
           cat alerte.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publier le rapport imprimable
@@ -59,6 +60,7 @@ jobs:
           path: |
             alerte.md
             alerte.html
+            comptage.html
           retention-days: 30
 
       # Une issue n'est ouverte que s'il y a quelque chose à commander
