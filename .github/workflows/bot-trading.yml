@@ -1,0 +1,74 @@
+name: Bot de trading
+
+# Le bot ne passe aucun ordre : ce workflow rejoue l'historique et produit
+# un rapport. Il tourne à la main (onglet Actions → Run workflow), comme
+# l'alerte stock — rien ici n'a besoin de se déclencher tout seul.
+#
+# Les bougies ne sont pas dans le dépôt (voir .gitignore) : sans dossier
+# marches/, le workflow tourne sur les données de démonstration, qui sont
+# tirées au sort et ne disent rien de la rentabilité des stratégies.
+on:
+  workflow_dispatch:
+    inputs:
+      rapport:
+        description: "Quel rapport produire"
+        type: choice
+        options: [backtest, matin, soir]
+        default: backtest
+      capital:
+        description: "Capital de départ du portefeuille simulé"
+        type: string
+        default: "10000"
+
+permissions:
+  contents: read
+
+jobs:
+  rapport:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Choisir la source des bougies
+        id: source
+        run: |
+          if [ -d marches ] && ls marches/*.csv >/dev/null 2>&1; then
+            echo "option=--marches marches" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Pas de dossier marches/ : rapport sur données de démonstration."
+            echo "option=--demo" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Produire le rapport
+        env:
+          SOURCE: ${{ steps.source.outputs.option }}
+          RAPPORT: ${{ inputs.rapport }}
+          CAPITAL: ${{ inputs.capital }}
+        run: |
+          # shellcheck disable=SC2086 — $SOURCE porte deux mots (--marches marches).
+          python3 bot_trading.py $SOURCE --capital "$CAPITAL" \
+            --rapport "$RAPPORT" --format markdown --sortie bot.md \
+            --journal journal.csv
+          python3 bot_trading.py $SOURCE --capital "$CAPITAL" \
+            --format html --sortie bot.html
+
+          # Les messages du matin et du soir sortent en texte aligné : sans
+          # bloc de code, le résumé GitHub écraserait les retours à la ligne.
+          if [ "$RAPPORT" = "backtest" ]; then
+            cat bot.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            { echo '```'; cat bot.md; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Publier le rapport
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-trading
+          path: |
+            bot.md
+            bot.html
+            journal.csv
+          retention-days: 30
