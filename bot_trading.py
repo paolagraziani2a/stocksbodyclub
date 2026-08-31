@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bot de trading — le deuxième bot du dépôt.
+"""Bot de trading.
 
 Il ne traite que cinq marchés, et rien d'autre :
 
