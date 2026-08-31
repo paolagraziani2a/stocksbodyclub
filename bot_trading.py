@@ -6,8 +6,8 @@ Il ne traite que cinq marchés, et rien d'autre :
     📈 S&P 500   retour à la moyenne, bougies 15 min
     📈 NASDAQ    retour à la moyenne, bougies 15 min
     ₿  Bitcoin   cassure en momentum, bougies 1 h
-    🥇 Or        suivi de tendance, bougies 4 h
-    🛢 Pétrole   suivi de tendance, bougies 4 h
+    🥇 Or        suivi de tendance lent, bougies 4 h
+    🛢 Pétrole   suivi de tendance lent, bougies 4 h
 
 Trois garde-fous, appliqués à *chaque* trade, sans exception :
 
@@ -91,7 +91,7 @@ PAR_CODE = {marche.code: marche for marche in MARCHES}
 LIBELLES_STRATEGIE = {
     RETOUR_MOYENNE: "retour à la moyenne",
     CASSURE: "cassure en momentum",
-    TENDANCE: "suivi de tendance",
+    TENDANCE: "suivi de tendance lent",
 }
 
 COLONNES_BOUGIES = ("horodatage", "ouverture", "haut", "bas", "cloture", "volume")
@@ -295,10 +295,14 @@ class Reglages:
     facteur_volume: float = 1.5      # volume exigé, en multiple du volume moyen
     periode_suivi: int = 10          # moyenne qui sert de sortie
 
-    # Suivi de tendance (Or, Pétrole — 4 h)
-    moyenne_rapide: int = 10
-    moyenne_lente: int = 40
-    periode_confirmation: int = 20
+    # Suivi de tendance (Or, Pétrole — 4 h). Volontairement lent : les
+    # matières premières avancent par vagues plus propres que les indices,
+    # et une entrée qui réagit vite ne ferait qu'attraper le bruit.
+    moyenne_rapide: int = 20
+    moyenne_lente: int = 80
+    periode_confirmation: int = 30
+    separation_min: float = 0.5      # écart entre les moyennes, en ATR
+    marge_cassure: float = 0.25      # dépassement exigé de l'extrême, en ATR
 
     # Volatilité
     periode_atr: int = 14
@@ -327,9 +331,9 @@ def signal_retour_moyenne(bougies: list[Chandelle], r: Reglages) -> Signal | Non
         return None  # marché en tendance : pas notre terrain
 
     if ecart <= -r.seuil_entree:
-        return Signal(LONG, f"prix à {ecart:+.1f}σ sous sa moyenne")
+        return Signal(LONG, f"prix à {nombre(ecart)}σ sous sa moyenne")
     if ecart >= r.seuil_entree:
-        return Signal(COURT, f"prix à {ecart:+.1f}σ au-dessus de sa moyenne")
+        return Signal(COURT, f"prix à {nombre(ecart)}σ au-dessus de sa moyenne")
     return None
 
 
@@ -351,30 +355,46 @@ def signal_cassure(bougies: list[Chandelle], r: Reglages) -> Signal | None:
         return None  # ça casse, mais sans conviction : on laisse passer
 
     if derniere.cloture > sommet:
-        return Signal(LONG, f"cassure du sommet ({rapport:.1f}× le volume moyen)")
+        return Signal(LONG, f"cassure du sommet ({nombre(rapport, signe_=False)}× le volume moyen)")
     if derniere.cloture < creux:
-        return Signal(COURT, f"cassure du creux ({rapport:.1f}× le volume moyen)")
+        return Signal(COURT, f"cassure du creux ({nombre(rapport, signe_=False)}× le volume moyen)")
     return None
 
 
 def signal_tendance(bougies: list[Chandelle], r: Reglages) -> Signal | None:
-    """On suit la direction installée, confirmée par un nouvel extrême.
+    """On suit la vague, lentement, sans se laisser entrer par le bruit.
 
-    ⚠️ La planche qui décrivait l'or et le pétrole manque : cette stratégie
-    est un choix par défaut, pas une reprise de l'original. Voir le README.
+    Les matières premières avancent par vagues plus propres que les indices :
+    la stratégie est délibérément lente, et refuse toute entrée marginale.
+    Deux filtres pour ça, tous deux mesurés en ATR, donc à l'échelle du
+    marché plutôt qu'en pourcentage arbitraire :
+
+    - les deux moyennes doivent être franchement séparées — un croisement
+      de justesse va et vient au gré du bruit, ce n'est pas une tendance ;
+    - la clôture doit dépasser l'extrême précédent d'une vraie marge, pas
+      l'effleurer.
+
+    La sortie, elle, reste sur le simple croisement inverse : lent à entrer,
+    prompt à partir.
     """
     rapide = moyenne_mobile(bougies, r.moyenne_rapide)
     lente = moyenne_mobile(bougies, r.moyenne_lente)
     sommet = plus_haut(bougies, r.periode_confirmation)
     creux = plus_bas(bougies, r.periode_confirmation)
+    volatilite = atr(bougies, r.periode_atr)
     if rapide is None or lente is None or sommet is None or creux is None:
         return None
+    if not volatilite:
+        return None
 
+    separation = (rapide - lente) / volatilite
+    marge = volatilite * r.marge_cassure
     derniere = bougies[-1]
-    if rapide > lente and derniere.cloture > sommet:
-        return Signal(LONG, "tendance haussière, nouveau sommet")
-    if rapide < lente and derniere.cloture < creux:
-        return Signal(COURT, "tendance baissière, nouveau creux")
+
+    if separation >= r.separation_min and derniere.cloture > sommet + marge:
+        return Signal(LONG, "vague haussière installée, sommet franchi net")
+    if separation <= -r.separation_min and derniere.cloture < creux - marge:
+        return Signal(COURT, "vague baissière installée, creux enfoncé net")
     return None
 
 
@@ -758,7 +778,7 @@ def etat_du_marche(
         lecture = (
             "pas encore assez de bougies"
             if ecart is None
-            else f"à {ecart:+.1f}σ de sa moyenne"
+            else f"à {nombre(ecart)}σ de sa moyenne"
         )
     elif marche.strategie == CASSURE:
         sommet = plus_haut(bougies, reglages.periode_canal)
@@ -768,16 +788,24 @@ def etat_du_marche(
         else:
             distance = (sommet - derniere.cloture) / derniere.cloture * 100
             lecture = (
-                f"sommet du canal à {distance:+.1f} %, "
-                f"volume {derniere.volume / reference:.1f}× la moyenne"
+                f"sommet du canal à {nombre(distance)} %, "
+                f"volume {nombre(derniere.volume / reference, signe_=False)}× la moyenne"
             )
     else:
         rapide = moyenne_mobile(bougies, reglages.moyenne_rapide)
         lente = moyenne_mobile(bougies, reglages.moyenne_lente)
-        if rapide is None or lente is None:
+        volatilite = atr(bougies, reglages.periode_atr)
+        if rapide is None or lente is None or not volatilite:
             lecture = "pas encore assez de bougies"
         else:
-            lecture = "tendance haussière" if rapide > lente else "tendance baissière"
+            # L'écart en ATR est ce qui décide : le dire, plutôt que de
+            # trancher « haussière » sur un croisement qui ne tient à rien.
+            separation = (rapide - lente) / volatilite
+            if abs(separation) < reglages.separation_min:
+                lecture = f"pas de vague nette ({nombre(separation)} ATR d'écart)"
+            else:
+                sens = "haussière" if separation > 0 else "baissière"
+                lecture = f"vague {sens} ({nombre(separation)} ATR d'écart)"
 
     return Etat(
         marche=marche,
@@ -834,6 +862,12 @@ def pourcentage(part: float) -> str:
 def taux(part: float, decimales: int = 0) -> str:
     """24 % — sans signe : un taux de réussite, un recul."""
     return f"{part * 100:.{decimales}f} %".replace(".", ",")
+
+
+def nombre(valeur: float, decimales: int = 1, signe_: bool = True) -> str:
+    """−2,6 — un écart en σ ou en ATR, à la française."""
+    format_ = f"{{:{'+' if signe_ else ''}.{decimales}f}}"
+    return format_.format(valeur).replace(".", ",").replace("-", "−")
 
 
 def _peindre(texte: str, montant: float, couleur: bool) -> str:
@@ -994,7 +1028,8 @@ def rendu_texte(
             lignes.append(f"  {marche.intitule} — aucun trade")
             continue
         lignes.append(
-            f"  {marche.intitule} — {part.trades} trades, "
+            f"  {marche.intitule} — {part.trades} trade"
+            f"{'s' if part.trades > 1 else ''}, "
             f"{taux(part.taux_reussite)} gagnants, "
             + _peindre(signe(part.gain_total), part.gain_total, couleur)
             + f"  [{LIBELLES_STRATEGIE[marche.strategie]}, {marche.unite}]"

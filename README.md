@@ -133,8 +133,8 @@ deuxième bot du dépôt, et il ne traite que **cinq marchés**.
 | 📈 **S&P 500** | retour à la moyenne | 15 min |
 | 📈 **NASDAQ** | retour à la moyenne | 15 min |
 | ₿ **Bitcoin** | cassure en momentum | 1 h |
-| 🥇 **Or** | suivi de tendance | 4 h |
-| 🛢 **Pétrole** | suivi de tendance | 4 h |
+| 🥇 **Or** | suivi de tendance lent | 4 h |
+| 🛢 **Pétrole** | suivi de tendance lent | 4 h |
 
 Rien d'autre n'est traité : un `TESLA.csv` posé dans le dossier des bougies
 est ignoré.
@@ -173,15 +173,25 @@ volume moyen**. C'est la condition de volume qui sépare la vraie cassure du
 faux signal : sans elle, une sortie de canal est le plus souvent un piège. Il
 ressort quand le prix repasse sous sa moyenne 10.
 
-**Suivi de tendance** (Or, Pétrole) — moyenne 10 au-dessus de la moyenne 40,
-confirmée par un nouveau sommet sur 20 périodes ; sortie au croisement
-inverse.
+**Suivi de tendance lent** (Or, Pétrole) — les matières premières avancent par
+vagues plus propres que les indices, donc la stratégie est **délibérément
+lente** : moyenne 20 contre moyenne 80, confirmée par un nouveau sommet sur
+30 périodes. Et surtout, elle refuse toute entrée marginale — c'est le
+« pas de bruit à l'entrée » de la source, traduit en deux filtres mesurés en
+ATR, donc à l'échelle du marché plutôt qu'en pourcentage arbitraire :
 
-> ⚠️ **La stratégie or / pétrole est une hypothèse.** La planche qui la
-> décrivait (6/13) manquait dans la source : le suivi de tendance est le choix
-> par défaut retenu ici, pas une reprise de l'original. Si la planche
-> réapparaît, c'est `signal_tendance()` qu'il faut réécrire — le reste ne
-> bouge pas.
+- les deux moyennes doivent être séparées d'au moins 0,5 ATR — un croisement
+  de justesse va et vient au gré du bruit, ce n'est pas une vague ;
+- la clôture doit dépasser l'extrême précédent de 0,25 ATR, pas l'effleurer.
+
+La sortie, elle, reste sur le simple croisement inverse : lent à entrer,
+prompt à partir.
+
+> Ces deux filtres ne sont pas cosmétiques. Sur les données de démonstration
+> ils font passer l'or et le pétrole de 20 trades à 4 — le pétrole, en
+> particulier, de 13 entrées toutes perdantes à une seule. C'est exactement ce
+> qu'un filtre anti-bruit doit faire : ne rien prendre plutôt que prendre du
+> bruit.
 
 ## Les garde-fous
 
@@ -202,6 +212,16 @@ Appliqués à *chaque* trade, sans exception :
    montent pas ensemble.
 
 Le rapport indique combien d'entrées le filtre a refusées.
+
+> **Une tension à connaître, dans la source elle-même.** Le stop dur à 1 %
+> s'applique « sans exception », y compris à l'or et au pétrole — mais sur des
+> bougies de 4 h, 1 % est plus étroit que le va-et-vient normal du marché. Le
+> bot se fait donc sortir de vagues qui, sur le fond, allaient dans son sens :
+> les deux marchés lents restent perdants sur les données de démonstration
+> même après le filtre anti-bruit. Un stop calé sur l'ATR (1,5 à 2 ATR, par
+> exemple) résoudrait ça, mais ce ne serait plus la règle annoncée : le code
+> applique la règle annoncée, et la signale ici plutôt que de la corriger en
+> douce. Le paramètre est `Risque.stop_perte`, si vous voulez essayer.
 
 ## Les deux messages du jour
 

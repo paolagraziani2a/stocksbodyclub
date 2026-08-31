@@ -216,23 +216,48 @@ class TestCassure(unittest.TestCase):
 
 
 class TestTendance(unittest.TestCase):
-    """Or et pétrole : suivre la direction installée."""
+    """Or et pétrole : suivre la vague, lentement, sans entrer sur du bruit."""
 
     def test_achat_en_tendance_haussiere(self):
-        bougies = serie([100.0 + indice for indice in range(45)])
+        bougies = serie([100.0 + indice for indice in range(100)])
         signal = bot.signal_tendance(bougies, bot.Reglages())
         self.assertIsNotNone(signal)
         self.assertEqual(signal.sens, bot.LONG)
 
     def test_vente_en_tendance_baissiere(self):
-        bougies = serie([200.0 - indice for indice in range(45)])
+        bougies = serie([300.0 - indice for indice in range(100)])
         self.assertEqual(bot.signal_tendance(bougies, bot.Reglages()).sens, bot.COURT)
 
     def test_rien_sans_direction(self):
-        self.assertIsNone(bot.signal_tendance(serie(plat(45)), bot.Reglages()))
+        self.assertIsNone(bot.signal_tendance(serie(plat(100)), bot.Reglages()))
+
+    def test_strategie_lente_il_faut_un_long_historique(self):
+        """45 bougies suffisaient à la version rapide ; plus maintenant."""
+        bougies = serie([100.0 + indice for indice in range(45)])
+        self.assertIsNone(bot.signal_tendance(bougies, bot.Reglages()))
+
+    def test_un_sommet_effleure_ne_declenche_rien(self):
+        """« Pas de bruit d'entrée » : franchir de justesse ne suffit pas."""
+        reglages = bot.Reglages()
+        montee = serie([100.0 + indice for indice in range(100)])
+        sommet = bot.plus_haut(montee, reglages.periode_confirmation)
+
+        # On rabaisse la dernière clôture juste au-dessus du sommet : le
+        # niveau est franchi, mais sans la marge exigée.
+        effleure = montee[:-1] + [
+            bougie(
+                cloture=sommet + 0.01,
+                haut=sommet + 0.02,
+                bas=sommet - 0.01,
+                moment=montee[-1].horodatage,
+                ouverture=montee[-2].cloture,
+            )
+        ]
+        self.assertIsNotNone(bot.signal_tendance(montee, reglages))
+        self.assertIsNone(bot.signal_tendance(effleure, reglages))
 
     def test_sortie_au_retournement(self):
-        bougies = serie([100.0 + indice for indice in range(45)][::-1])
+        bougies = serie([100.0 + indice for indice in range(100)][::-1])
         self.assertEqual(
             bot.motif_sortie(bot.PAR_CODE["OR"], bot.LONG, bougies, bot.Reglages()),
             "la tendance s'est retournée",
