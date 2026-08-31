@@ -41,14 +41,14 @@ jobs:
         run: |
           # --code-sortie renvoie 2 (rouge), 1 (orange), 0 (vert) ou 3 (erreur).
           code=0
-          python3 alerte_stock.py --format markdown --sortie alerte.md --code-sortie || code=$?
+          python3 cafe/alerte_stock.py --format markdown --sortie alerte.md --code-sortie || code=$?
           if [ "$code" = "3" ]; then
             echo "::error::L'inventaire n'a pas pu être lu : corrigez inventaire.csv."
             exit 1
           fi
           echo "niveau=$code" >> "$GITHUB_OUTPUT"
-          python3 alerte_stock.py --format html --sortie alerte.html
-          python3 alerte_stock.py --format feuille --sortie feuille.html
+          python3 cafe/alerte_stock.py --format html --sortie alerte.html
+          python3 cafe/alerte_stock.py --format feuille --sortie feuille.html
           cat alerte.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publier le rapport imprimable

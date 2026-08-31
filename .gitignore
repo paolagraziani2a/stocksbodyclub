@@ -3,12 +3,12 @@ __pycache__/
 alerte.md
 alerte.html
 feuille.html
-page/apercu.html
+cafe/page/apercu.html
 
 # Bougies téléchargées chez un fournisseur de données, et sorties du bot :
 # ça se régénère, ça peut être volumineux, et les cotations ne sont pas
 # toujours redistribuables.
-marches/
+trading/marches/
 bot.md
 bot.html
 journal.csv

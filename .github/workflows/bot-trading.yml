@@ -5,7 +5,7 @@ name: Bot de trading
 # l'alerte stock — rien ici n'a besoin de se déclencher tout seul.
 #
 # Les bougies ne sont pas dans le dépôt (voir .gitignore) : sans dossier
-# marches/, le workflow tourne sur les données de démonstration, qui sont
+# trading/marches/, le workflow tourne sur les données de démonstration, qui sont
 # tirées au sort et ne disent rien de la rentabilité des stratégies.
 on:
   workflow_dispatch:
@@ -35,10 +35,10 @@ jobs:
       - name: Choisir la source des bougies
         id: source
         run: |
-          if [ -d marches ] && ls marches/*.csv >/dev/null 2>&1; then
-            echo "option=--marches marches" >> "$GITHUB_OUTPUT"
+          if [ -d trading/marches ] && ls trading/marches/*.csv >/dev/null 2>&1; then
+            echo "option=--marches trading/marches" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::Pas de dossier marches/ : rapport sur données de démonstration."
+            echo "::notice::Pas de dossier trading/marches/ : rapport sur données de démonstration."
             echo "option=--demo" >> "$GITHUB_OUTPUT"
           fi
 
@@ -48,11 +48,11 @@ jobs:
           RAPPORT: ${{ inputs.rapport }}
           CAPITAL: ${{ inputs.capital }}
         run: |
-          # shellcheck disable=SC2086 — $SOURCE porte deux mots (--marches marches).
-          python3 bot_trading.py $SOURCE --capital "$CAPITAL" \
+          # shellcheck disable=SC2086 — $SOURCE porte deux mots (--marches trading/marches).
+          python3 trading/bot_trading.py $SOURCE --capital "$CAPITAL" \
             --rapport "$RAPPORT" --format markdown --sortie bot.md \
             --journal journal.csv
-          python3 bot_trading.py $SOURCE --capital "$CAPITAL" \
+          python3 trading/bot_trading.py $SOURCE --capital "$CAPITAL" \
             --format html --sortie bot.html
 
           # Les messages du matin et du soir sortent en texte aligné : sans
