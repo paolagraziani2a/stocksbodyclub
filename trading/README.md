@@ -147,11 +147,66 @@ d'écart) ») et le signal éventuel. Celui du soir donne le capital, le nombre 
 trades, le taux de réussite, le plus fort recul et les derniers trades
 refermés. Une Routine peut les envoyer par notification et par e-mail.
 
-## Les bougies
+## Récupérer les bougies chez Alpaca
+
+```bash
+export APCA_API_KEY_ID=...
+export APCA_API_SECRET_KEY=...
+
+python3 trading/telecharger_bougies.py                    # les cinq marchés
+python3 trading/telecharger_bougies.py --marche BITCOIN --jours 90
+python3 trading/telecharger_bougies.py --montrer-urls     # sans rien appeler
+```
+
+### ⚠️ Lecture seule, et c'est structurel
+
+[`telecharger_bougies.py`](telecharger_bougies.py) ne parle qu'à
+`data.alpaca.markets`, l'API de **données**. Il ne connaît pas l'adresse de
+l'API de **trading** : il ne peut donc ni passer d'ordre, ni lire, ni modifier
+la moindre position.
+
+**C'est ce qui compte si un autre bot tourne déjà sur le compte** : celui-ci ne
+peut pas le déranger, pas par prudence mais par construction. Un appel dirigé
+vers l'API de trading est refusé avant de partir, et un test le vérifie.
+
+Les clés se lisent dans l'environnement, jamais en argument — elles resteraient
+dans l'historique du shell.
+
+### Ce que les symboles valent vraiment
+
+Alpaca ne propose **ni forex, ni CFD, ni contrats à terme**. L'or et le pétrole
+n'y existent donc que sous forme d'ETF, et les deux approximations ne se valent
+pas :
+
+| Marché | Symbole | Ce que c'est vraiment |
+| --- | --- | --- |
+| S&P 500 | `SPY` | ETF répliquant l'indice — fidèle |
+| NASDAQ | `QQQ` | ETF sur le NASDAQ 100 — fidèle |
+| Bitcoin | `BTC/USD` | vrai comptant, coté 24 h/24 |
+| Or | `GLD` | ETF adossé à l'or physique — bon proxy |
+| Pétrole | `USO` | ETF sur **contrats à terme** — s'écarte du baril |
+
+`USO` est le maillon faible : il roule ses contrats, donc il dérive du prix du
+baril sur la durée. Une stratégie de tendance lente en subit l'effet. À garder
+en tête avant de lire un résultat sur le pétrole.
+
+Deux autres conséquences du passage par des ETF :
+
+- **Ils ne cotent qu'aux heures de bourse.** Une bougie « 4 h » couvre donc une
+  séance de 6 h 30, pas une tranche régulière ; et il y a un trou à chaque
+  nuit et chaque week-end. C'est exactement le cas que `prix_sortie_stop`
+  simule — sur ces données, le stop sautera pour de bon.
+- **Le flux gratuit est IEX**, qui ne voit qu'une petite part du volume. Sur
+  15 min, les bougies peuvent être maigres. `--feed sip` demande un abonnement
+  payant.
+
+## Le format des bougies
 
 Un fichier CSV par marché dans `trading/marches/`, nommé d'après le code du
 marché — `SP500.csv`, `NASDAQ.csv`, `BITCOIN.csv`, `OR.csv`, `PETROLE.csv`. Un
-marché sans fichier est simplement absent du rapport.
+marché sans fichier est simplement absent du rapport. C'est ce que le
+téléchargeur écrit, et rien n'empêche de le remplir à la main ou depuis un
+autre fournisseur.
 
 ```csv
 horodatage,ouverture,haut,bas,cloture,volume
@@ -173,6 +228,7 @@ Depuis la racine du dépôt — le script retrouve ses fichiers tout seul, quel 
 soit le dossier d'où on l'appelle :
 
 ```bash
+python3 trading/telecharger_bougies.py                      # récupérer les bougies
 python3 trading/bot_trading.py --demo                       # backtest sur données de démo
 python3 trading/bot_trading.py                              # sur trading/marches/
 python3 trading/bot_trading.py --demo --format markdown     # rapport en markdown
@@ -194,3 +250,7 @@ dit.
 ```bash
 python3 -m unittest discover -s trading/tests -v
 ```
+
+Les tests du téléchargeur n'appellent jamais Alpaca : l'appel réseau est
+injecté, et les réponses sont enregistrées. Ils tournent hors ligne, sans clé
+et sans consommer de quota.

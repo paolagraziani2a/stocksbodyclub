@@ -7,7 +7,7 @@ workflow.
 | Dossier | Projet | |
 | --- | --- | --- |
 | [`cafe/`](cafe/) | **Alerte de stock — THE BODY CLUB** | Les employés relèvent les stocks sur un iPad, la gérante reçoit un rapport le vendredi. En service. |
-| [`trading/`](trading/) | **Bot de trading** | Cinq marchés — S&P 500, NASDAQ, Bitcoin, or, pétrole. Portefeuille simulé, aucun ordre réel. |
+| [`trading/`](trading/) | **Bot de trading** | Cinq marchés — S&P 500, NASDAQ, Bitcoin, or, pétrole. Bougies lues chez Alpaca en lecture seule ; portefeuille simulé, aucun ordre réel. |
 
 ```bash
 python3 -m unittest discover -s cafe/tests -v       # les tests du café
