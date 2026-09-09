@@ -63,36 +63,50 @@ mise en pause.
 
 ### Notification ntfy
 
-**ntfy est le canal principal** : chaque vendredi la Routine pousse le rapport
-dessus, et l'iPad reçoit la notification. La notification et l'e-mail Claude
-restent en second rideau — les deux canaux sont indépendants, un échec ntfy ne
-fait pas perdre le rapport, et la Routine dit en dernière ligne si l'envoi est
-passé.
+**ntfy est le canal principal** : l'iPad reçoit la notification du vendredi dans
+l'application ntfy. La notification et l'e-mail Claude restent en second rideau
+— les canaux sont indépendants, un échec ntfy ne fait pas perdre le rapport.
 
-La priorité de la notification suit le niveau général : `urgent` en 🔴 (elle
-perce le mode silencieux), `high` en 🟠, `default` en 🟢.
+### Pourquoi ça passe par GitHub
 
-Le sujet ntfy est dans [`ntfy.txt`](ntfy.txt). Sur l'iPad : installer
-l'application **ntfy** (App Store), *Subscribe to topic*, coller ce sujet.
+L'environnement d'exécution de Claude filtre ses sorties réseau : `ntfy.sh` y est
+refusé (`403` du proxy), **seul GitHub passe**. Le trajet est donc :
 
-Envoi manuel :
-
-```bash
-python3 alerte_stock.py | python3 envoyer_ntfy.py --niveau rouge
-echo "Commande passée chez Metro" | python3 envoyer_ntfy.py
+```
+Routine du vendredi ──► écrit rapports/AAAA-Sxx.md ──► push GitHub
+                                                          │
+                        workflow « Notification ntfy » ◄───┘
+                        (runner GitHub, Internet non filtré)
+                                     │
+                                     └──► ntfy.sh ──► iPad
 ```
 
-⚠️ Sur `ntfy.sh`, un sujet n'est protégé que par son nom : qui le connaît peut
-lire les notifications et en publier. D'où un nom long et non devinable — ne pas
-le diffuser au-delà de l'équipe, et le changer dans `ntfy.txt` s'il fuite.
+Le dossier `rapports/` sert au passage d'archive des relevés hebdomadaires.
 
-> **Réseau.** L'environnement d'exécution filtre les sorties réseau : par défaut
-> seuls GitHub et les dépôts de paquets passent, et `ntfy.sh` est refusé (erreur
-> `403 Forbidden` du proxy). Tant que `ntfy.sh` n'est pas autorisé dans la
-> politique réseau de l'environnement, l'envoi ntfy échoue proprement et le
-> rapport continue d'arriver par notification Claude et par e-mail. Le réglage
-> se fait sur les environnements de Claude Code sur le web :
-> <https://code.claude.com/docs/en/claude-code-on-the-web>
+La priorité de la notification est lue sur la pastille en tête du rapport :
+`urgent` en 🔴 (elle perce le mode silencieux de l'iPad), `high` en 🟠,
+`default` en 🟢.
+
+### Mise en place
+
+1. **Le secret.** Dépôt → *Settings → Secrets and variables → Actions →
+   New repository secret* → nom `NTFY_TOPIC`, valeur : le sujet ntfy.
+2. **L'iPad.** App Store → **ntfy** → *Subscribe to topic* → coller le même
+   sujet.
+3. Pour tester sans attendre vendredi : onglet *Actions* → **Notification
+   ntfy** → *Run workflow*.
+
+> ⚠️ **Ce dépôt est public**, et sur `ntfy.sh` un sujet n'est protégé que par
+> son nom : qui le connaît peut lire les notifications et **en publier de
+> fausses**. Le sujet ne doit donc vivre que dans le secret GitHub — jamais
+> dans un fichier commité. S'il fuite, en générer un nouveau, mettre à jour le
+> secret et le réabonnement sur l'iPad.
+
+Envoi manuel depuis une machine non filtrée :
+
+```bash
+NTFY_TOPIC=le-sujet python3 alerte_stock.py | python3 envoyer_ntfy.py --niveau rouge
+```
 
 ## 3. Le dépôt
 

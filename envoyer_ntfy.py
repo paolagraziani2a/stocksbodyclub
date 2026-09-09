@@ -4,14 +4,16 @@
 Le rapport du vendredi passe par ici : ntfy pousse la notification sur
 l'application ntfy de l'iPad, sans compte ni serveur à gérer.
 
-Le sujet ntfy se lit dans la variable d'environnement NTFY_TOPIC, ou dans
-le fichier ntfy.txt à côté de ce script.
+Le sujet ntfy se lit dans la variable d'environnement NTFY_TOPIC — ou, à
+défaut, dans un fichier ntfy.txt local, que .gitignore tient hors du dépôt.
 
     echo "Stock bas : lait avoine" | python3 envoyer_ntfy.py
     python3 envoyer_ntfy.py --titre "Relevé du vendredi" --fichier rapport.txt
 
 ⚠️ Sur ntfy.sh, un sujet n'est protégé que par son nom : qui le connaît peut
-lire et écrire dessus. D'où un nom long et non devinable.
+lire les notifications et en publier de fausses. Ce dépôt étant public, le
+sujet ne doit JAMAIS y être commité — il vit dans le secret GitHub
+NTFY_TOPIC, que le workflow « Notification ntfy » utilise.
 """
 
 from __future__ import annotations

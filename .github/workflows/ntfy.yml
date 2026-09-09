@@ -1,0 +1,85 @@
+name: Notification ntfy
+
+# L'environnement d'exécution de Claude filtre ses sorties réseau et refuse
+# ntfy.sh ; seul GitHub passe. La Routine du vendredi dépose donc son rapport
+# dans rapports/, et c'est ce workflow — sur un runner GitHub, qui a Internet
+# sans filtre — qui le pousse sur ntfy.
+on:
+  push:
+    paths:
+      - "rapports/**.md"
+  workflow_dispatch:
+    inputs:
+      fichier:
+        description: "Rapport à renvoyer (vide = le plus récent)"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  pousser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Envoyer le rapport sur ntfy
+        env:
+          # Le sujet ne vit que dans les secrets du dépôt : ce dépôt est
+          # public, et sur ntfy.sh un sujet n'est protégé que par son nom.
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          CHOISI: ${{ inputs.fichier }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "::error::Le secret NTFY_TOPIC n'est pas défini. Dépôt → Settings → Secrets and variables → Actions → New repository secret."
+            exit 1
+          fi
+
+          rapport="${CHOISI:-}"
+          if [ -z "$rapport" ]; then
+            # Les noms sont du type 2026-S37.md : l'ordre alphabétique est
+            # l'ordre chronologique.
+            rapport=$(ls -1 rapports/*.md 2>/dev/null | sort | tail -n 1 || true)
+          fi
+          if [ -z "$rapport" ] || [ ! -f "$rapport" ]; then
+            echo "::error::Aucun rapport à envoyer (cherché dans rapports/)."
+            exit 1
+          fi
+          echo "Rapport : $rapport"
+
+          # La priorité suit le niveau général, lu sur la pastille du rapport.
+          tete=$(head -c 400 "$rapport")
+          if   printf '%s' "$tete" | grep -q '🔴'; then prio=urgent;  tag=red_circle
+          elif printf '%s' "$tete" | grep -q '🟠'; then prio=high;    tag=orange_circle
+          elif printf '%s' "$tete" | grep -q '🟢'; then prio=default; tag=green_circle
+          else                                          prio=high;    tag=warning
+          fi
+          echo "Priorité : $prio"
+
+          # ntfy.sh refuse au-delà de 4 Ko. On coupe à 3500 octets, puis
+          # `iconv -c` jette le caractère éventuellement coupé en deux — sans
+          # quoi un emoji tronqué rendrait le corps invalide en UTF-8.
+          if [ "$(wc -c < "$rapport")" -gt 3500 ]; then
+            head -c 3500 "$rapport" | iconv -f utf-8 -t utf-8 -c > /tmp/corps.txt
+            printf '\n\n[...] rapport tronque, voir la page.\n' >> /tmp/corps.txt
+          else
+            cp "$rapport" /tmp/corps.txt
+          fi
+
+          code=$(curl -sS -o /tmp/ntfy.out -w '%{http_code}' --max-time 30 \
+            -X POST "https://ntfy.sh/${NTFY_TOPIC}" \
+            -H "Title: Releve stocks Body Club" \
+            -H "Priority: ${prio}" \
+            -H "Tags: ${tag}" \
+            -H "Markdown: yes" \
+            --data-binary @/tmp/corps.txt)
+
+          echo "ntfy a répondu $code"
+          cat /tmp/ntfy.out || true
+          if [ "$code" != "200" ]; then
+            echo "::error::ntfy a refusé l'envoi (code $code)."
+            exit 1
+          fi
+          echo "### 🔔 Rapport poussé sur ntfy — \`$rapport\` (priorité $prio)" >> "$GITHUB_STEP_SUMMARY"
