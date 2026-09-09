@@ -507,6 +507,59 @@ def refus_correlation(
 
 
 # --------------------------------------------------------------------------
+# Ce que le courtier prend
+# --------------------------------------------------------------------------
+
+# Demi-écart de cotation, en fraction du prix : on achète toujours un peu
+# au-dessus du prix affiché et on vend un peu en dessous. Ordres de grandeur
+# courants chez un courtier CFD grand public, à ajuster au vôtre — le pétrole
+# et le Bitcoin coûtent plus cher à traiter qu'un indice.
+DEMI_SPREAD = {
+    "SP500": 0.000050,
+    "NASDAQ": 0.000060,
+    "BITCOIN": 0.000250,
+    "OR": 0.000100,
+    "PETROLE": 0.000300,
+}
+
+
+@dataclass(frozen=True)
+class Couts:
+    """Les frais que le prix affiché ne montre pas.
+
+    Sans eux, un backtest est un rapport de vacances : c'est là que meurent
+    les stratégies qui tradent souvent. Le retour à la moyenne sur 15 min
+    passe des dizaines d'ordres là où le suivi de tendance sur 4 h en passe
+    un ; à frais égaux par ordre, ils ne paient pas du tout la même note.
+    """
+
+    commission: float = 0.0002    # par côté, en fraction du notionnel
+    glissement: float = 0.0001    # exécution un peu moins bonne que le prix visé
+    spread: bool = True           # appliquer l'écart de cotation du marché
+
+    def penalite(self, code: str) -> float:
+        """Ce qui s'ajoute au prix à l'achat, et s'en retranche à la vente."""
+        demi = DEMI_SPREAD.get(code, 0.0) if self.spread else 0.0
+        return demi + self.glissement
+
+
+# L'écart de cotation vient d'une table par marché : il faut donc aussi
+# l'éteindre explicitement, sinon « sans frais » en garderait la moitié.
+SANS_FRAIS = Couts(commission=0.0, glissement=0.0, spread=False)
+
+
+def prix_execute(sens: str, prix: float, code: str, couts: Couts, entree: bool) -> float:
+    """Le prix réellement obtenu — on ne traite jamais au prix affiché.
+
+    À l'entrée, un long achète et un court vend ; à la sortie, l'inverse.
+    Dans les deux cas la pénalité joue contre nous, jamais pour.
+    """
+    achete = (sens == LONG) == entree
+    penalite = couts.penalite(code)
+    return prix * (1 + penalite) if achete else prix * (1 - penalite)
+
+
+# --------------------------------------------------------------------------
 # Portefeuille simulé
 # --------------------------------------------------------------------------
 
@@ -520,6 +573,7 @@ class Position:
     stop: float
     entree_le: datetime
     motif: str
+    frais_entree: float = 0.0   # commission déjà due, réglée à la clôture
 
     def gain_latent(self, prix: float) -> float:
         ecart = prix - self.prix_entree
@@ -540,10 +594,16 @@ class Trade:
     motif_entree: str
     motif_sortie: str
     gain: float
+    frais: float = 0.0   # commissions des deux côtés, déjà déduites du gain
 
     @property
     def gagnant(self) -> bool:
         return self.gain > 0
+
+    @property
+    def gain_brut(self) -> float:
+        """Ce que le trade aurait rapporté sans commissions — pour comparer."""
+        return self.gain + self.frais
 
     @property
     def rendement(self) -> float:
@@ -555,43 +615,78 @@ class Trade:
 @dataclass
 class Portefeuille:
     capital_initial: float
+    couts: Couts = field(default_factory=Couts)
     capital: float = 0.0
     positions: dict[str, Position] = field(default_factory=dict)
     journal: list[Trade] = field(default_factory=list)
     refuses: list[str] = field(default_factory=list)
+    frais: float = 0.0   # total des commissions payées, sur les trades refermés
 
     def __post_init__(self) -> None:
         if not self.capital:
             self.capital = self.capital_initial
 
-    def ouvrir(self, position: Position) -> None:
-        self.positions[position.marche] = position
+    def ouvrir(
+        self,
+        code: str,
+        sens: str,
+        prix: float,
+        quantite: float,
+        moment: datetime,
+        motif: str,
+        risque: Risque,
+    ) -> Position:
+        """`prix` est le prix affiché ; l'exécution réelle est calculée ici.
 
-    def fermer(
-        self, code: str, prix: float, moment: datetime, motif: str
-    ) -> Trade:
+        Le stop se place sous le prix *obtenu*, pas sous le prix visé : c'est
+        de l'entrée réelle qu'on accepte de perdre 1 %.
+        """
+        entree = prix_execute(sens, prix, code, self.couts, entree=True)
+        position = Position(
+            marche=code,
+            sens=sens,
+            prix_entree=entree,
+            quantite=quantite,
+            stop=prix_stop(sens, entree, risque),
+            entree_le=moment,
+            motif=motif,
+            frais_entree=self.couts.commission * entree * quantite,
+        )
+        self.positions[code] = position
+        return position
+
+    def fermer(self, code: str, prix: float, moment: datetime, motif: str) -> Trade:
         position = self.positions.pop(code)
-        gain = position.gain_latent(prix)
+        sortie = prix_execute(position.sens, prix, code, self.couts, entree=False)
+        frais = position.frais_entree + self.couts.commission * sortie * position.quantite
+        gain = position.gain_latent(sortie) - frais
+
         self.capital += gain
+        self.frais += frais
         trade = Trade(
             marche=code,
             sens=position.sens,
             prix_entree=position.prix_entree,
-            prix_sortie=prix,
+            prix_sortie=sortie,
             quantite=position.quantite,
             entree_le=position.entree_le,
             sortie_le=moment,
             motif_entree=position.motif,
             motif_sortie=motif,
             gain=gain,
+            frais=frais,
         )
         self.journal.append(trade)
         return trade
 
     def valeur(self, derniers_prix: dict[str, float]) -> float:
-        """Capital réalisé plus le latent des positions encore ouvertes."""
+        """Capital réalisé plus le latent des positions encore ouvertes.
+
+        Le latent est net de la commission d'entrée déjà due : une position
+        ouverte est en retard de ses frais dès la première seconde.
+        """
         latent = sum(
-            position.gain_latent(derniers_prix[code])
+            position.gain_latent(derniers_prix[code]) - position.frais_entree
             for code, position in self.positions.items()
             if code in derniers_prix
         )
@@ -609,6 +704,20 @@ def stop_touche(position: Position, bougie: Chandelle) -> bool:
     if position.sens == LONG:
         return bougie.bas <= position.stop
     return bougie.haut >= position.stop
+
+
+def prix_sortie_stop(position: Position, bougie: Chandelle) -> float:
+    """Où le stop se remplit vraiment.
+
+    Tant que la bougie traverse le stop en séance, l'ordre part à son prix.
+    Mais si le marché **ouvre déjà au-delà** — un trou à l'ouverture, après
+    un week-end ou une annonce — il n'y a eu aucun échange au prix du stop :
+    l'ordre part au premier prix coté. C'est là que « 1 %, sans exception »
+    cesse d'être vrai, et pas qu'un peu.
+    """
+    if position.sens == LONG:
+        return min(position.stop, bougie.ouverture)
+    return max(position.stop, bougie.ouverture)
 
 
 # --------------------------------------------------------------------------
@@ -637,6 +746,7 @@ def rejouer(
     capital: float = 10_000.0,
     reglages: Reglages | None = None,
     risque: Risque | None = None,
+    couts: Couts | None = None,
 ) -> Portefeuille:
     """Rejoue l'historique bougie par bougie et renvoie le portefeuille obtenu.
 
@@ -647,7 +757,9 @@ def rejouer(
     """
     reglages = reglages or Reglages()
     risque = risque or Risque()
-    portefeuille = Portefeuille(capital_initial=capital)
+    portefeuille = Portefeuille(
+        capital_initial=capital, couts=couts if couts is not None else Couts()
+    )
 
     for moment, code, indice in chronologie(series):
         marche = PAR_CODE[code]
@@ -657,7 +769,12 @@ def rejouer(
         position = portefeuille.positions.get(code)
         if position is not None:
             if stop_touche(position, bougie):
-                portefeuille.fermer(code, position.stop, moment, "stop à 1 % touché")
+                portefeuille.fermer(
+                    code,
+                    prix_sortie_stop(position, bougie),
+                    moment,
+                    "stop à 1 % touché",
+                )
                 continue
             motif = motif_sortie(marche, position.sens, historique, reglages)
             if motif:
@@ -684,15 +801,13 @@ def rejouer(
             continue
 
         portefeuille.ouvrir(
-            Position(
-                marche=code,
-                sens=signal.sens,
-                prix_entree=bougie.cloture,
-                quantite=quantite,
-                stop=prix_stop(signal.sens, bougie.cloture, risque),
-                entree_le=moment,
-                motif=signal.motif,
-            )
+            code=code,
+            sens=signal.sens,
+            prix=bougie.cloture,
+            quantite=quantite,
+            moment=moment,
+            motif=signal.motif,
+            risque=risque,
         )
 
     return portefeuille
@@ -961,6 +1076,8 @@ def message_soir(
         f"Gain moyen : {signe(resultat.gain_moyen)}   "
         f"Perte moyenne : {signe(resultat.perte_moyenne)}",
         f"Plus fort recul : −{taux(resultat.plus_fort_recul, 1)}",
+        f"Frais payés : {somme(portefeuille.frais)} "
+        f"({taux(portefeuille.frais / portefeuille.capital_initial, 2)} du capital)",
         "",
         "-" * 68,
     ]
@@ -1016,6 +1133,8 @@ def rendu_texte(
         f"Gain moyen        : {signe(resultat.gain_moyen)}",
         f"Perte moyenne     : {signe(resultat.perte_moyenne)}",
         f"Plus fort recul   : −{taux(resultat.plus_fort_recul, 1)}",
+        f"Frais payés       : {somme(portefeuille.frais)} "
+        f"({taux(portefeuille.frais / portefeuille.capital_initial, 2)} du capital)",
         "",
         "PAR MARCHÉ",
         "-" * 68,
@@ -1084,6 +1203,8 @@ def rendu_markdown(
         f"| Gain moyen | {signe(resultat.gain_moyen)} |",
         f"| Perte moyenne | {signe(resultat.perte_moyenne)} |",
         f"| Plus fort recul | −{taux(resultat.plus_fort_recul, 1)} |",
+        f"| Frais payés | {somme(portefeuille.frais)} "
+        f"({taux(portefeuille.frais / portefeuille.capital_initial, 2)} du capital) |",
         "",
         "## Par marché",
         "",
@@ -1216,6 +1337,8 @@ Bitcoin, Or, Pétrole.</p>
     <tr><th>Gain moyen</th><td>{escape(signe(resultat.gain_moyen))}</td></tr>
     <tr><th>Perte moyenne</th><td>{escape(signe(resultat.perte_moyenne))}</td></tr>
     <tr><th>Plus fort recul</th><td>−{taux(resultat.plus_fort_recul, 1)}</td></tr>
+    <tr><th>Frais payés</th><td>{escape(somme(portefeuille.frais))}
+        ({taux(portefeuille.frais / portefeuille.capital_initial, 2)} du capital)</td></tr>
   </table>
 </section>
 
@@ -1391,6 +1514,14 @@ def construire_parseur() -> argparse.ArgumentParser:
         help="capital de départ du portefeuille simulé (défaut : 10 000)",
     )
     parseur.add_argument(
+        "--sans-frais",
+        action="store_true",
+        help=(
+            "ignorer spread, glissement et commissions — à ne lire que "
+            "comparé au rapport normal, pour voir ce que les frais coûtent"
+        ),
+    )
+    parseur.add_argument(
         "--rapport",
         choices=("backtest", "matin", "soir"),
         default="backtest",
@@ -1435,7 +1566,12 @@ def main(argv: list[str] | None = None) -> int:
         return 3
 
     reglages = Reglages()
-    portefeuille = rejouer(series, capital=arguments.capital, reglages=reglages)
+    portefeuille = rejouer(
+        series,
+        capital=arguments.capital,
+        reglages=reglages,
+        couts=SANS_FRAIS if arguments.sans_frais else Couts(),
+    )
     derniers_prix = {code: bougies[-1].cloture for code, bougies in series.items()}
     liste_etats = etats(series, reglages)
     moment = max(bougies[-1].horodatage for bougies in series.values())

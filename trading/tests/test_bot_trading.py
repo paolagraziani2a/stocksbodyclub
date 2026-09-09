@@ -344,37 +344,127 @@ class TestFiltreDeCorrelation(unittest.TestCase):
 
 
 class TestPortefeuille(unittest.TestCase):
+    """Sans frais, pour vérifier l'arithmétique seule — les frais ont leur
+    propre classe de tests plus bas."""
+
+    def portefeuille(self):
+        return bot.Portefeuille(capital_initial=10_000.0, couts=bot.SANS_FRAIS)
+
+    def ouvrir(self, p, sens=bot.LONG, prix=100.0, quantite=10.0, code="SP500"):
+        return p.ouvrir(
+            code=code, sens=sens, prix=prix, quantite=quantite,
+            moment=DEBUT, motif="test", risque=bot.Risque(),
+        )
+
     def test_gain_d_un_long(self):
-        p = bot.Portefeuille(capital_initial=10_000.0)
-        p.ouvrir(position(prix=100.0, quantite=10.0))
+        p = self.portefeuille()
+        self.ouvrir(p)
         trade = p.fermer("SP500", 110.0, DEBUT, "test")
         self.assertAlmostEqual(trade.gain, 100.0)
         self.assertAlmostEqual(p.capital, 10_100.0)
 
     def test_gain_d_un_court(self):
-        p = bot.Portefeuille(capital_initial=10_000.0)
-        p.ouvrir(position(sens=bot.COURT, prix=100.0, quantite=10.0))
+        p = self.portefeuille()
+        self.ouvrir(p, sens=bot.COURT)
         trade = p.fermer("SP500", 90.0, DEBUT, "test")
         self.assertAlmostEqual(trade.gain, 100.0)
 
     def test_perte_d_un_court_qui_monte(self):
-        p = bot.Portefeuille(capital_initial=10_000.0)
-        p.ouvrir(position(sens=bot.COURT, prix=100.0, quantite=10.0))
+        p = self.portefeuille()
+        self.ouvrir(p, sens=bot.COURT)
         self.assertAlmostEqual(p.fermer("SP500", 110.0, DEBUT, "test").gain, -100.0)
 
     def test_la_valeur_compte_le_latent(self):
-        p = bot.Portefeuille(capital_initial=10_000.0)
-        p.ouvrir(position(prix=100.0, quantite=10.0))
+        p = self.portefeuille()
+        self.ouvrir(p)
         self.assertAlmostEqual(p.valeur({"SP500": 105.0}), 10_050.0)
 
     def test_la_valeur_sans_position(self):
-        p = bot.Portefeuille(capital_initial=10_000.0)
+        p = self.portefeuille()
         self.assertAlmostEqual(p.valeur({}), 10_000.0)
 
     def test_rendement_d_un_trade(self):
-        p = bot.Portefeuille(capital_initial=10_000.0)
-        p.ouvrir(position(prix=100.0, quantite=10.0))
+        p = self.portefeuille()
+        self.ouvrir(p)
         self.assertAlmostEqual(p.fermer("SP500", 101.0, DEBUT, "t").rendement, 0.01)
+
+    def test_le_stop_est_pose_sous_le_prix_obtenu(self):
+        position = self.ouvrir(self.portefeuille())
+        self.assertAlmostEqual(position.stop, 99.0)
+
+
+class TestFrais(unittest.TestCase):
+    """Le prix affiché n'est pas le prix obtenu — et ça se paie deux fois."""
+
+    def test_on_achete_plus_cher_que_le_prix_affiche(self):
+        couts = bot.Couts()
+        obtenu = bot.prix_execute(bot.LONG, 100.0, "SP500", couts, entree=True)
+        self.assertGreater(obtenu, 100.0)
+
+    def test_on_vend_moins_cher_que_le_prix_affiche(self):
+        couts = bot.Couts()
+        obtenu = bot.prix_execute(bot.LONG, 100.0, "SP500", couts, entree=False)
+        self.assertLess(obtenu, 100.0)
+
+    def test_la_penalite_joue_toujours_contre_nous(self):
+        """Les quatre cas : on achète toujours plus haut, on vend plus bas."""
+        couts = bot.Couts()
+        achats = ((bot.LONG, True), (bot.COURT, False))    # entrer long, sortir d'un court
+        ventes = ((bot.LONG, False), (bot.COURT, True))    # sortir d'un long, entrer court
+
+        for sens, entree in achats:
+            obtenu = bot.prix_execute(sens, 100.0, "BITCOIN", couts, entree)
+            self.assertGreater(obtenu, 100.0, f"{sens}/{entree} devrait acheter plus cher")
+        for sens, entree in ventes:
+            obtenu = bot.prix_execute(sens, 100.0, "BITCOIN", couts, entree)
+            self.assertLess(obtenu, 100.0, f"{sens}/{entree} devrait vendre moins cher")
+
+    def test_le_petrole_coute_plus_cher_que_le_sp500(self):
+        couts = bot.Couts()
+        self.assertGreater(couts.penalite("PETROLE"), couts.penalite("SP500"))
+
+    def test_sans_frais_le_prix_obtenu_est_le_prix_affiche(self):
+        self.assertAlmostEqual(
+            bot.prix_execute(bot.LONG, 100.0, "SP500", bot.SANS_FRAIS, True), 100.0
+        )
+
+    def test_un_aller_retour_a_prix_constant_perd_de_l_argent(self):
+        """Ouvrir et refermer au même prix affiché n'est pas neutre."""
+        p = bot.Portefeuille(capital_initial=10_000.0)
+        p.ouvrir(
+            code="SP500", sens=bot.LONG, prix=100.0, quantite=10.0,
+            moment=DEBUT, motif="test", risque=bot.Risque(),
+        )
+        trade = p.fermer("SP500", 100.0, DEBUT, "test")
+        self.assertLess(trade.gain, 0.0)
+        self.assertGreater(trade.frais, 0.0)
+        self.assertAlmostEqual(p.frais, trade.frais)
+
+    def test_le_gain_brut_ignore_les_commissions(self):
+        p = bot.Portefeuille(capital_initial=10_000.0)
+        p.ouvrir(
+            code="SP500", sens=bot.LONG, prix=100.0, quantite=10.0,
+            moment=DEBUT, motif="test", risque=bot.Risque(),
+        )
+        trade = p.fermer("SP500", 110.0, DEBUT, "test")
+        self.assertAlmostEqual(trade.gain_brut, trade.gain + trade.frais)
+        self.assertGreater(trade.gain_brut, trade.gain)
+
+    def test_le_latent_est_net_de_la_commission_d_entree(self):
+        p = bot.Portefeuille(capital_initial=10_000.0)
+        p.ouvrir(
+            code="SP500", sens=bot.LONG, prix=100.0, quantite=10.0,
+            moment=DEBUT, motif="test", risque=bot.Risque(),
+        )
+        self.assertLess(p.valeur({"SP500": 100.0}), 10_000.0)
+
+    def test_les_frais_alourdissent_le_resultat_du_backtest(self):
+        series = bot.series_demo(300)
+        avec = bot.rejouer(series, capital=10_000.0)
+        sans = bot.rejouer(series, capital=10_000.0, couts=bot.SANS_FRAIS)
+        self.assertLess(avec.capital, sans.capital)
+        self.assertGreater(avec.frais, 0.0)
+        self.assertEqual(sans.frais, 0.0)
 
 
 class TestBilan(unittest.TestCase):
@@ -515,13 +605,67 @@ class TestRejouer(unittest.TestCase):
     def test_des_trades_sont_pris(self):
         self.assertGreater(len(self.portefeuille.journal), 0)
 
-    def test_aucune_perte_ne_depasse_le_stop(self):
-        """Le stop à 1 % borne chaque perte : rien ne doit passer au travers."""
-        for trade in self.portefeuille.journal:
+    def test_le_stop_borne_la_perte_de_marche(self):
+        """Hors frais, aucune perte ne dépasse le 1 % annoncé."""
+        sans_frais = bot.rejouer(
+            bot.series_demo(300), capital=10_000.0, couts=bot.SANS_FRAIS
+        )
+        for trade in sans_frais.journal:
             self.assertGreaterEqual(
                 trade.rendement, -bot.Risque().stop_perte - 1e-9,
                 f"{trade.marche} a perdu plus que son stop",
             )
+
+    def test_les_frais_font_perdre_plus_que_le_stop_annonce(self):
+        """Le constat honnête : « 1 %, sans exception » est 1 % sur le papier.
+
+        Le stop est touché à 1 %, mais on sort au prix qu'on obtient, pas à
+        celui qu'on vise, et les deux commissions s'ajoutent. La perte réelle
+        dépasse donc le 1 % annoncé — de peu, mais systématiquement.
+        """
+        risque, couts = bot.Risque(), bot.Couts()
+        stops = [t for t in self.portefeuille.journal if "stop" in t.motif_sortie]
+        self.assertGreater(len(stops), 0, "aucun stop dans l'échantillon")
+
+        self.assertTrue(
+            all(t.rendement < -risque.stop_perte for t in stops),
+            "chaque stop devrait coûter un peu plus que le 1 % annoncé",
+        )
+
+        # Plafond généreux du surcoût d'un aller-retour : les deux pénalités
+        # d'exécution et les deux commissions. Au-delà, ce ne sont plus les
+        # frais — c'est un trou à l'ouverture, testé séparément.
+        for trade in stops:
+            surcout = 2 * (couts.penalite(trade.marche) + couts.commission)
+            plancher = -(risque.stop_perte + surcout)
+            self.assertGreaterEqual(trade.rendement, plancher, trade.marche)
+
+    def test_un_trou_a_l_ouverture_fait_sauter_le_stop(self):
+        """Le cas où « sans exception » cesse vraiment d'être vrai."""
+        pos = bot.Position(
+            marche="SP500", sens=bot.LONG, prix_entree=100.0, quantite=1.0,
+            stop=99.0, entree_le=DEBUT, motif="",
+        )
+        # Le marché ouvre à 95 : personne n'a échangé à 99, l'ordre part à 95.
+        trou = bougie(cloture=94.0, ouverture=95.0, haut=95.0, bas=93.0)
+        self.assertTrue(bot.stop_touche(pos, trou))
+        self.assertAlmostEqual(bot.prix_sortie_stop(pos, trou), 95.0)
+
+    def test_sans_trou_le_stop_part_a_son_prix(self):
+        pos = bot.Position(
+            marche="SP500", sens=bot.LONG, prix_entree=100.0, quantite=1.0,
+            stop=99.0, entree_le=DEBUT, motif="",
+        )
+        traversee = bougie(cloture=99.5, ouverture=100.0, haut=100.2, bas=98.5)
+        self.assertAlmostEqual(bot.prix_sortie_stop(pos, traversee), 99.0)
+
+    def test_trou_a_l_ouverture_sur_un_court(self):
+        pos = bot.Position(
+            marche="SP500", sens=bot.COURT, prix_entree=100.0, quantite=1.0,
+            stop=101.0, entree_le=DEBUT, motif="",
+        )
+        trou = bougie(cloture=106.0, ouverture=105.0, haut=107.0, bas=105.0)
+        self.assertAlmostEqual(bot.prix_sortie_stop(pos, trou), 105.0)
 
     def test_jamais_plus_d_une_position_par_marche(self):
         for code in self.portefeuille.positions:
@@ -567,12 +711,8 @@ class TestRejouer(unittest.TestCase):
                     marche, signal.sens, portefeuille.positions
                 ):
                     portefeuille.ouvrir(
-                        bot.Position(
-                            marche=code, sens=signal.sens,
-                            prix_entree=derniere.cloture, quantite=1.0,
-                            stop=bot.prix_stop(signal.sens, derniere.cloture, risque),
-                            entree_le=moment, motif="",
-                        )
+                        code=code, sens=signal.sens, prix=derniere.cloture,
+                        quantite=1.0, moment=moment, motif="", risque=risque,
                     )
 
             groupes = [
@@ -752,6 +892,14 @@ class TestLigneDeCommande(unittest.TestCase):
         self.assertNotIn(
             bot.MARQUEUR_AVERTISSEMENT, sortie.read_text(encoding="utf-8")
         )
+
+    def test_les_frais_apparaissent_dans_le_rapport(self):
+        _, sortie = self.lancer(["--demo"])
+        self.assertIn("Frais payés", sortie)
+
+    def test_sans_frais_affiche_zero(self):
+        _, sortie = self.lancer(["--demo", "--sans-frais"])
+        self.assertIn("Frais payés       : 0,00 €", sortie)
 
     def test_dossier_de_marches_absent(self):
         code, _ = self.lancer(["--marches", "/introuvable"])

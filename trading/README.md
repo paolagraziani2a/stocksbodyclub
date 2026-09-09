@@ -25,11 +25,48 @@ Deux choses à savoir avant d'aller plus loin :
   **rien** de la rentabilité des stratégies, et chaque rapport produit à
   partir d'elles porte un avertissement en tête.
 - **Un backtest n'est pas un résultat.** Ces trois stratégies sont des
-  classiques publics, pas un avantage : rejouées sur du passé elles ne
-  prouvent rien sur l'avenir, et les frais, l'écart de cotation et les
-  glissements d'exécution ne sont pas simulés ici. Le montage décrit sur
-  Instagram promettait des résultats ; ce code ne promet que d'appliquer les
-  règles annoncées, ce qui est déjà autre chose.
+  classiques publics, pas un avantage : rejouées sur du passé, elles ne
+  prouvent rien sur l'avenir. Le montage décrit sur Instagram promettait des
+  résultats ; ce code ne promet que d'appliquer les règles annoncées, ce qui
+  est déjà autre chose.
+
+## Ce que le courtier prend
+
+Les frais **sont** simulés, parce qu'un backtest qui les ignore est un rapport
+de vacances. Trois postes, appliqués à chaque ordre :
+
+| Poste | Défaut | Pourquoi |
+| --- | --- | --- |
+| **Écart de cotation** | 0,005 % à 0,03 % selon le marché | On achète au-dessus du prix affiché, on vend en dessous. Le pétrole et le Bitcoin coûtent plus cher à traiter qu'un indice. |
+| **Glissement** | 0,01 % | L'exécution n'est jamais tout à fait au prix visé. |
+| **Commission** | 0,02 % du notionnel, par côté | Payée à l'entrée **et** à la sortie. |
+
+Ce sont des ordres de grandeur d'un courtier CFD grand public : à remplacer par
+ceux du vôtre, dans `DEMI_SPREAD` et `Couts`.
+
+```bash
+python3 trading/bot_trading.py --demo                # frais compris
+python3 trading/bot_trading.py --demo --sans-frais   # pour mesurer ce qu'ils coûtent
+```
+
+Deux conséquences qui ne sautent pas aux yeux :
+
+- **Le stop « dur à 1 %, sans exception » perd plus d'1 %.** On sort au prix
+  qu'on obtient, pas à celui qu'on vise, et les deux commissions s'ajoutent :
+  chaque stop coûte environ 1,06 %. Systématiquement, pour chaque trade perdant.
+- **Et bien davantage sur un trou à l'ouverture.** Si le marché rouvre sous le
+  stop — un week-end, une annonce — personne n'a échangé au prix du stop :
+  l'ordre part au premier prix coté. Le bot le simule (`prix_sortie_stop`), donc
+  la perte peut largement dépasser 1 %. C'est la limite réelle d'un stop, et
+  aucun réglage ne la supprime.
+
+Les frais frappent d'autant plus fort qu'on trade souvent : le retour à la
+moyenne sur 15 min passe des dizaines d'ordres là où le suivi de tendance sur
+4 h en passe un.
+
+> Les données de `--demo` n'ont **aucun trou** : chaque bougie ouvre sur la
+> clôture précédente. Le chemin des trous est testé unitairement, mais il ne
+> se déclenche que sur de vraies cotations.
 
 ## Les trois stratégies
 
@@ -90,10 +127,12 @@ Le rapport indique combien d'entrées le filtre a refusées.
 > bougies de 4 h, 1 % est plus étroit que le va-et-vient normal du marché. Le
 > bot se fait donc sortir de vagues qui, sur le fond, allaient dans son sens :
 > les deux marchés lents restent perdants sur les données de démonstration
-> même après le filtre anti-bruit. Un stop calé sur l'ATR (1,5 à 2 ATR, par
-> exemple) résoudrait ça, mais ce ne serait plus la règle annoncée : le code
-> applique la règle annoncée, et la signale ici plutôt que de la corriger en
-> douce. Le paramètre est `Risque.stop_perte`, si vous voulez essayer.
+> même après le filtre anti-bruit. Frais compris, chaque sortie au stop coûte
+> en réalité ~1,06 %, et davantage sur un trou à l'ouverture. Un stop calé sur
+> l'ATR (1,5 à 2 ATR) résoudrait ça, mais ce ne serait plus la règle annoncée :
+> le code applique la règle annoncée, et la signale ici plutôt que de la
+> corriger en douce. Le paramètre est `Risque.stop_perte`, si vous voulez
+> essayer.
 
 ## Les deux messages du jour
 
@@ -140,6 +179,7 @@ python3 trading/bot_trading.py --demo --format markdown     # rapport en markdow
 python3 trading/bot_trading.py --demo --format html --sortie bot.html
 python3 trading/bot_trading.py --demo --journal journal.csv # les trades, pour un tableur
 python3 trading/bot_trading.py --demo --capital 25000       # autre capital de départ
+python3 trading/bot_trading.py --demo --sans-frais          # sans spread ni commissions
 ```
 
 Aucune installation nécessaire : Python 3.11 ou plus récent suffit.
