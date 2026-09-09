@@ -63,8 +63,14 @@ mise en pause.
 
 ### Notification ntfy
 
-En plus de la notification et de l'e-mail Claude, le rapport est poussé sur
-**ntfy** — pratique pour recevoir l'alerte sur l'iPad sans y installer Claude.
+**ntfy est le canal principal** : chaque vendredi la Routine pousse le rapport
+dessus, et l'iPad reçoit la notification. La notification et l'e-mail Claude
+restent en second rideau — les deux canaux sont indépendants, un échec ntfy ne
+fait pas perdre le rapport, et la Routine dit en dernière ligne si l'envoi est
+passé.
+
+La priorité de la notification suit le niveau général : `urgent` en 🔴 (elle
+perce le mode silencieux), `high` en 🟠, `default` en 🟢.
 
 Le sujet ntfy est dans [`ntfy.txt`](ntfy.txt). Sur l'iPad : installer
 l'application **ntfy** (App Store), *Subscribe to topic*, coller ce sujet.
