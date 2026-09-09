@@ -61,6 +61,33 @@ mise en pause.
 > Fin octobre, il faudra la passer à 14h UTC pour rester à 15h — sinon le rapport
 > arrivera à 14h.
 
+### Notification ntfy
+
+En plus de la notification et de l'e-mail Claude, le rapport est poussé sur
+**ntfy** — pratique pour recevoir l'alerte sur l'iPad sans y installer Claude.
+
+Le sujet ntfy est dans [`ntfy.txt`](ntfy.txt). Sur l'iPad : installer
+l'application **ntfy** (App Store), *Subscribe to topic*, coller ce sujet.
+
+Envoi manuel :
+
+```bash
+python3 alerte_stock.py | python3 envoyer_ntfy.py --niveau rouge
+echo "Commande passée chez Metro" | python3 envoyer_ntfy.py
+```
+
+⚠️ Sur `ntfy.sh`, un sujet n'est protégé que par son nom : qui le connaît peut
+lire les notifications et en publier. D'où un nom long et non devinable — ne pas
+le diffuser au-delà de l'équipe, et le changer dans `ntfy.txt` s'il fuite.
+
+> **Réseau.** L'environnement d'exécution filtre les sorties réseau : par défaut
+> seuls GitHub et les dépôts de paquets passent, et `ntfy.sh` est refusé (erreur
+> `403 Forbidden` du proxy). Tant que `ntfy.sh` n'est pas autorisé dans la
+> politique réseau de l'environnement, l'envoi ntfy échoue proprement et le
+> rapport continue d'arriver par notification Claude et par e-mail. Le réglage
+> se fait sur les environnements de Claude Code sur le web :
+> <https://code.claude.com/docs/en/claude-code-on-the-web>
+
 ## 3. Le dépôt
 
 ### La liste des produits
