@@ -1,0 +1,20 @@
+name: Rappel releve stock
+on:
+  schedule:
+    - cron: '0 17 * * 5'
+  workflow_dispatch:
+jobs:
+  rappel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Envoyer le rappel
+        env:
+          TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          curl -sS --fail \
+            -H "Title: Releve des stocks Body Club" \
+            -H "Priority: high" \
+            -H "Tags: clipboard" \
+            -H "Click: https://claude.ai/artifact/V53qQVhMhbad6H8X77C2XC" \
+            -d "C'est l'heure de remplir le releve des stocks. Appuie ici pour l'ouvrir." \
+            "https://ntfy.sh/${TOPIC}"
