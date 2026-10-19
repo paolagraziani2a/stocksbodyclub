@@ -1,0 +1,24 @@
+name: Notification Telegram
+on:
+  push:
+    paths: ['rapports/**']
+  workflow_dispatch:
+jobs:
+  telegram:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Envoyer le dernier rapport
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          f=$(ls rapports/*.md 2>/dev/null | sort | tail -1)
+          if [ -z "$f" ]; then
+            texte="Test : la notification Telegram du Body Club fonctionne."
+          else
+            texte=$(python3 -c "import sys;print(open(sys.argv[1],encoding='utf-8').read()[:4000])" "$f")
+          fi
+          curl -sS --fail-with-body -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT}" --data-urlencode "text=${texte}"
+            
