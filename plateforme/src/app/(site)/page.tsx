@@ -1,20 +1,23 @@
 import Link from "next/link";
-import { CoachCard, Display, Label, Marquee, Pill, PriceRow, Section } from "@/components/site";
+import { CoachCard, Display, Intensity, Label, Marquee, Pill, PriceRow, Section } from "@/components/site";
+import { DISCIPLINE_ORDER, DISCIPLINES } from "@/lib/format";
 import { cn } from "@/components/ui";
 import { getAppearance } from "@/lib/appearance";
 import { formatShortDay, formatTime } from "@/lib/dates";
 import { createClient } from "@supabase/supabase-js";
 import { publicEnv } from "@/lib/env";
-import { getCoaches, getPhotos, getProducts, getSessions, mapsLink } from "@/lib/site";
+import { getClassTypes, getCoaches, getPhotos, getProducts, getSessions, mapsLink } from "@/lib/site";
 
 export default async function Home() {
   const now = new Date();
   const anon = createClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, { auth: { persistSession: false } });
-  const [a, photos, coaches, products, sessions, { data: classType }] = await Promise.all([
+  const [a, photos, coaches, products, sessions, { data: classType }, types] = await Promise.all([
     getAppearance(), getPhotos(), getCoaches(), getProducts(),
     getSessions(now.toISOString(), new Date(now.getTime() + 7 * 864e5).toISOString()),
-    anon.from("class_types").select("duration_minutes, default_capacity").eq("active", true).limit(1).maybeSingle(),
+    anon.from("class_types").select("duration_minutes, default_capacity").eq("discipline", "lagree").eq("active", true).limit(1).maybeSingle(),
+    getClassTypes(),
   ]);
+  const practices = DISCIPLINE_ORDER.map((d) => ({ d, list: types.filter((t) => t.discipline === d) })).filter((p) => p.list.length);
   const heroImage = a.hero_image_url ?? photos[0]?.url ?? null;
   const gallery = photos.filter((p) => p.url !== heroImage).slice(0, 6);
   const next = sessions.filter((s) => s.status === "scheduled" && s.booked_count < s.capacity).slice(0, 4);
@@ -65,13 +68,45 @@ export default async function Home() {
         ) : <div className="aspect-[4/5] w-full rounded-xl bg-sage" aria-hidden />}
       </Section>
 
+      {/* ---------- Les pratiques ---------- */}
+      {practices.length > 0 && (
+        <Section className="pt-4 sm:pt-8">
+          <div className="grid gap-8 md:grid-cols-2 md:items-end">
+            <div>
+              <Label n="02">Mouvement</Label>
+              <Display main={["Une", "Deux", "Trois"][practices.length - 1] ?? String(practices.length)} accent={practices.length > 1 ? "pratiques." : "pratique."} className="mt-6" />
+            </div>
+            <p className="leading-relaxed text-muted">
+              Du Lagree intense au yoga doux, nos cours sont pensés comme une progression. Choisissez selon votre énergie du jour : nos coachs adaptent toujours.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-px overflow-hidden rounded-2xl border border-ink bg-ink md:grid-cols-3">
+            {practices.map(({ d, list }, i) => (
+              <Link key={d} href={`/cours#${d}`} className="group flex flex-col bg-ivory p-6 transition hover:bg-sand sm:p-8">
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">0{i + 1}</span>
+                <span className="mt-3 font-serif text-5xl font-bold uppercase leading-none">{DISCIPLINES[d].label}</span>
+                <span className="mt-3 text-sm text-muted">{DISCIPLINES[d].tagline}</span>
+                <ul className="mt-6 flex-1 border-t border-line">
+                  {list.map((t) => (
+                    <li key={t.id} className="flex items-center justify-between gap-3 border-b border-line py-2.5 text-sm">
+                      <span>{t.name}</span><Intensity value={t.intensity} />
+                    </li>
+                  ))}
+                </ul>
+                <span className="mt-6 font-mono text-[11px] uppercase tracking-[0.15em] transition group-hover:translate-x-1">Découvrir →</span>
+              </Link>
+            ))}
+          </div>
+        </Section>
+      )}
+
       {/* ---------- La méthode ---------- */}
       {a.method_text && (
         <section className="border-y border-line bg-sand">
           <Section>
             <div className="grid gap-12 md:grid-cols-[1.2fr_1fr] md:items-end">
               <div>
-                <Label n="02">Force lente, intensité totale</Label>
+                <Label n="03">Force lente, intensité totale</Label>
                 <Display main={a.method_title} className="mt-6" />
               </div>
               <p className="leading-relaxed text-muted">{a.method_text}</p>
@@ -123,7 +158,7 @@ export default async function Home() {
       <Section className="pt-8 sm:pt-12">
         <div className="grid gap-12 md:grid-cols-2 md:items-end">
           <div>
-            <Label n="03">Réservation · en direct</Label>
+            <Label n="04">Réservation · en direct</Label>
             <Display main="Réserver" accent="un cours." className="mt-6" />
           </div>
           <p className="leading-relaxed text-muted">
@@ -156,8 +191,8 @@ export default async function Home() {
           <Section>
             <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
               <div>
-                <Label n="04" light>L&apos;équipe</Label>
-                <Display main="Les coachs" accent="qui vous suivent." className="mt-6" accentClassName="text-sage" />
+                <Label n="05" light>L&apos;équipe</Label>
+                <Display main="L'équipe" accent="qui vous suit." className="mt-6" accentClassName="text-sage" />
               </div>
               <Pill href="/coachs" tone="ghostLight">Toute l&apos;équipe</Pill>
             </div>
@@ -173,7 +208,7 @@ export default async function Home() {
         <Section>
           <div className="grid gap-12 md:grid-cols-[1fr_1.3fr]">
             <div>
-              <Label n="05">Tarifs</Label>
+              <Label n="06">Tarifs</Label>
               <Display main="Votre" accent="rythme." className="mt-6" />
               <p className="mt-8 max-w-sm leading-relaxed text-muted">
                 Des cartes sans engagement, valables à partir de votre premier cours. Ou l&apos;illimité, pour venir aussi souvent que vous le voulez.
@@ -188,7 +223,7 @@ export default async function Home() {
       {/* ---------- Infos pratiques ---------- */}
       <section id="infos" className="scroll-mt-16 border-t border-line bg-sand">
         <Section>
-          <Label n="06">Nous trouver</Label>
+          <Label n="07">Nous trouver</Label>
           <Display main="Infos" accent="pratiques." className="mt-6" />
           <div className="mt-14 grid gap-10 md:grid-cols-3">
             <Info title="Adresse">

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CoachPortrait, Display, Label, Section } from "@/components/site";
+import { CoachPortrait, Display, Intensity, Label, Section } from "@/components/site";
 import { cn } from "@/components/ui";
 import { addDays, formatTime, hoursUntil, isUpcoming, isValidDay, labelOfDay, parisDay } from "@/lib/dates";
+import { DISCIPLINE_ORDER, DISCIPLINES, isDiscipline, LEVELS } from "@/lib/format";
 import { getSessions } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { SessionAction } from "./session-action";
@@ -15,13 +16,25 @@ export default async function PlanningPage({ searchParams }: PageProps<"/plannin
   const start = isValidDay(sp.du) && sp.du >= today ? sp.du : today;
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const selected = isValidDay(sp.jour) && days.includes(sp.jour) ? sp.jour : start;
+  const discipline = isDiscipline(sp.discipline) ? sp.discipline : null;
+  const course = typeof sp.cours === "string" ? sp.cours.slice(0, 80) : null;
+  /** Lien qui conserve les filtres en cours. */
+  const href = (params: Record<string, string | null>) => {
+    const q = new URLSearchParams();
+    const all = { du: start, jour: selected, discipline, cours: course, ...params };
+    for (const [k, v] of Object.entries(all)) if (v) q.set(k, v);
+    return `/planning?${q}`;
+  };
 
   const supabase = await createClient();
-  const [sessions, { data: { user } }, { data: settings }] = await Promise.all([
+  const [allSessions, { data: { user } }, { data: settings }] = await Promise.all([
     getSessions(`${addDays(start, -1)}T00:00:00Z`, `${addDays(start, 8)}T00:00:00Z`),
     supabase.auth.getUser(),
     supabase.from("studio_settings").select("cancel_window_hours").single(),
   ]);
+  const sessions = allSessions.filter((x) =>
+    (!discipline || x.class_types?.discipline === discipline) && (!course || x.class_types?.slug === course));
+  const courseName = course ? allSessions.find((x) => x.class_types?.slug === course)?.class_types?.name : null;
   const ofDay = sessions.filter((s) => parisDay(s.starts_at) === selected && isUpcoming(s.starts_at));
   const countByDay = new Map(days.map((d) => [d, sessions.filter((s) => parisDay(s.starts_at) === d && s.status === "scheduled" && isUpcoming(s.starts_at)).length]));
 
@@ -45,10 +58,27 @@ export default async function PlanningPage({ searchParams }: PageProps<"/plannin
       </Section>
 
       <Section className="pt-0 sm:pt-0">
+        {/* Filtres par discipline */}
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          {[null, ...DISCIPLINE_ORDER].map((d) => (
+            <Link key={d ?? "tous"} href={href({ discipline: d, cours: null })} scroll={false}
+              className={cn("rounded-full border px-4 py-2 font-mono text-[11px] uppercase tracking-[0.15em] transition",
+                (discipline ?? null) === d && !course ? "border-ink bg-ink text-ivory" : "border-ink/20 hover:border-ink")}>
+              {d ? DISCIPLINES[d].label : "Tous les cours"}
+            </Link>
+          ))}
+          {courseName && (
+            <Link href={href({ cours: null })} scroll={false}
+              className="rounded-full border border-ink bg-ink px-4 py-2 font-mono text-[11px] uppercase tracking-[0.15em] text-ivory">
+              {courseName} ✕
+            </Link>
+          )}
+        </div>
+
         {/* Sélecteur de jour : défilement horizontal sur mobile */}
         <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 sm:mx-0 sm:px-0">
           {days.map((d) => (
-            <Link key={d} href={`/planning?du=${start}&jour=${d}`} scroll={false}
+            <Link key={d} href={href({ jour: d })} scroll={false}
               className={cn(
                 "flex min-w-[66px] flex-col items-center rounded-full border px-3 py-3 transition",
                 d === selected ? "border-ink bg-ink text-ivory" : "border-ink/20 hover:border-ink",
@@ -58,7 +88,7 @@ export default async function PlanningPage({ searchParams }: PageProps<"/plannin
               <span className={cn("mt-1.5 h-1 w-1 rounded-full", countByDay.get(d) ? (d === selected ? "bg-sage" : "bg-taupe") : "bg-transparent")} />
             </Link>
           ))}
-          <Link href={`/planning?du=${addDays(start, 7)}`} aria-label="Semaine suivante"
+          <Link href={href({ du: addDays(start, 7), jour: null })} aria-label="Semaine suivante"
             className="flex min-w-[56px] items-center justify-center rounded-full border border-ink/20 hover:border-ink">→</Link>
         </div>
 
@@ -88,7 +118,14 @@ export default async function PlanningPage({ searchParams }: PageProps<"/plannin
                   )}
                   <div className="min-w-0 flex-1">
                     <p className={cn("truncate font-serif text-2xl font-bold uppercase leading-none", cancelled && "line-through")}>{s.title}</p>
-                    {s.teachers && <Link href={`/coachs/${s.teachers.slug}`} className="text-sm text-muted hover:text-ink">avec {s.teachers.display_name}</Link>}
+                    <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+                      {s.teachers && <Link href={`/coachs/${s.teachers.slug}`} className="hover:text-ink">avec {s.teachers.display_name}</Link>}
+                      {s.class_types && (
+                        <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.15em]">
+                          {LEVELS[s.class_types.level]} <Intensity value={s.class_types.intensity} />
+                        </span>
+                      )}
+                    </p>
                     <p className={cn("mt-1 font-mono text-[10px] uppercase tracking-[0.15em] sm:hidden", left <= 2 && left > 0 ? "text-taupe" : "text-muted")}>
                       {cancelled ? "Annulé" : left > 0 ? `${left} place${left > 1 ? "s" : ""}` : "Complet"}
                     </p>

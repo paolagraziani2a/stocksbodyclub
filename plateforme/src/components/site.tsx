@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Appearance } from "@/lib/appearance";
 import { formatEuros } from "@/lib/money";
-import { validityLabel } from "@/lib/format";
+import { DISCIPLINES, type Discipline, validityLabel } from "@/lib/format";
 import type { Coach, Product } from "@/lib/site";
 import { pillStyles } from "./pill";
 import { cn } from "./ui";
@@ -105,6 +105,9 @@ export function CoachCard({ coach, index, dark = false }: { coach: Coach; index?
         <span aria-hidden className={cn("pb-1 transition group-hover:translate-x-1", dark ? "text-ivory/70" : "text-muted")}>→</span>
       </div>
       {coach.headline && <p className={cn("mt-1 text-sm", dark ? "text-ivory/70" : "text-muted")}>{coach.headline}</p>}
+      {coach.disciplines?.length > 1 && (
+        <p className="mt-2 flex flex-wrap gap-1.5">{coach.disciplines.map((d) => <DisciplineTag key={d} d={d} light={dark} />)}</p>
+      )}
       {coach.specialties.length > 0 && (
         <p className="mt-3 flex flex-wrap gap-1.5">
           {coach.specialties.slice(0, 3).map((s) => (
@@ -172,3 +175,24 @@ export function Wordmark({ a, className, light = false }: { a: Appearance; class
   );
 }
 
+
+/** Intensité d'un cours : 1 à 3 « piments » (comme sur le site du club). */
+export function Intensity({ value, light = false }: { value: number; light?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1" title={`Intensité ${value}/3`} aria-label={`Intensité ${value} sur 3`}>
+      {[1, 2, 3].map((i) => (
+        <span key={i} className={cn("h-2.5 w-1.5 rounded-full", i <= value ? (light ? "bg-ivory" : "bg-ink") : light ? "bg-ivory/25" : "bg-ink/15")} />
+      ))}
+    </span>
+  );
+}
+
+/** Étiquette de discipline (Lagree / Yoga / Mat Pilates). */
+export function DisciplineTag({ d, light = false }: { d: Discipline; light?: boolean }) {
+  return (
+    <span className={cn("rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em]",
+      light ? "border-ivory/30 text-ivory/80" : "border-ink/20 text-muted")}>
+      {DISCIPLINES[d].label}
+    </span>
+  );
+}

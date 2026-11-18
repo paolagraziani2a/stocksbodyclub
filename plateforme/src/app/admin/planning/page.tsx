@@ -6,13 +6,13 @@ import { requireAdmin } from "@/lib/auth";
 import { addDays, formatTime, isValidDay, labelOfDay, mondayOf, parisDay } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { copyWeek, createSessions } from "./actions";
-import { SessionFields, type TeacherOption } from "./session-fields";
+import { SessionFields, type TeacherOption, type TypeOption } from "./session-fields";
 
 export const metadata: Metadata = { title: "Planning" };
 
 type Row = {
   id: string; title: string; starts_at: string; ends_at: string; capacity: number; booked_count: number;
-  status: "scheduled" | "cancelled"; teacher_id: string | null; teachers: { display_name: string } | null;
+  status: "scheduled" | "cancelled"; teacher_id: string | null; teachers: { display_name: string } | null; class_types: { color: string } | null;
 };
 
 export default async function PlanningPage({ searchParams }: PageProps<"/admin/planning">) {
@@ -24,15 +24,16 @@ export default async function PlanningPage({ searchParams }: PageProps<"/admin/p
   const newDay = isValidDay(sp.jour) ? sp.jour : days.includes(today) ? today : monday;
 
   const supabase = await createClient();
-  const [{ data: sessions }, { data: teachers }] = await Promise.all([
+  const [{ data: sessions }, { data: teachers }, { data: types }] = await Promise.all([
     supabase
       .from("class_sessions")
-      .select("id, title, starts_at, ends_at, capacity, booked_count, status, teacher_id, teachers(display_name)")
+      .select("id, title, starts_at, ends_at, capacity, booked_count, status, teacher_id, teachers(display_name), class_types(color)")
       .gte("starts_at", `${addDays(monday, -1)}T00:00:00Z`)
       .lt("starts_at", `${addDays(monday, 8)}T00:00:00Z`)
       .order("starts_at")
       .returns<Row[]>(),
-    supabase.from("teachers").select("id, display_name").eq("active", true).order("display_name").returns<TeacherOption[]>(),
+    supabase.from("teachers").select("id, display_name, disciplines").eq("active", true).order("display_name").returns<TeacherOption[]>(),
+    supabase.from("class_types").select("id, name, discipline, duration_minutes, default_capacity").eq("active", true).order("sort_order").returns<TypeOption[]>(),
   ]);
 
   const byDay = new Map(days.map((d) => [d, [] as Row[]]));
@@ -72,8 +73,9 @@ export default async function PlanningPage({ searchParams }: PageProps<"/admin/p
                   <li key={s.id}>
                     <Link
                       href={`/admin/planning/${s.id}`}
+                      style={s.class_types ? { borderLeftColor: s.class_types.color } : undefined}
                       className={cn(
-                        "block rounded-xl border border-line bg-white px-3 py-2.5 text-sm transition hover:border-taupe",
+                        "block rounded-xl border border-l-4 border-line bg-white px-3 py-2.5 text-sm transition hover:border-taupe",
                         s.status === "cancelled" && "opacity-50 line-through",
                       )}
                     >
@@ -101,7 +103,7 @@ export default async function PlanningPage({ searchParams }: PageProps<"/admin/p
         <Card id="nouveau">
           <h2 className="text-2xl">Nouveau cours</h2>
           <ActionForm action={createSessions} className="mt-6">
-            <SessionFields key={newDay} teachers={teachers ?? []} defaults={{ date: newDay }} />
+            <SessionFields key={newDay} teachers={teachers ?? []} types={types ?? []} defaults={{ date: newDay }} />
             <div className="mt-4 flex flex-wrap items-end gap-4">
               <Field label="Répéter" hint="Même jour, même heure, chaque semaine">
                 <select name="repeat" defaultValue="1" className="rounded-xl border border-line bg-white px-3.5 py-2.5">

@@ -6,9 +6,10 @@ import { mapsLink } from "@/lib/site";
 
 const NAV = [
   { n: "01", href: "/planning", label: "Planning" },
-  { n: "02", href: "/coachs", label: "Coachs" },
-  { n: "03", href: "/tarifs", label: "Tarifs" },
-  { n: "04", href: "/#infos", label: "Le studio" },
+  { n: "02", href: "/cours", label: "Cours" },
+  { n: "03", href: "/coachs", label: "Coachs" },
+  { n: "04", href: "/tarifs", label: "Tarifs" },
+  { n: "05", href: "/#infos", label: "Le studio" },
 ];
 
 export default async function SiteLayout({ children }: LayoutProps<"/">) {
@@ -38,7 +39,7 @@ export default async function SiteLayout({ children }: LayoutProps<"/">) {
               </span>
             </summary>
             <nav className="absolute inset-x-0 top-16 flex h-[calc(100svh-4rem)] flex-col bg-ivory px-5 pb-8 pt-4">
-              {[...NAV, { n: "05", href: "/compte", label: "Mon compte" }].map((n) => (
+              {[...NAV, { n: "06", href: "/compte", label: "Mon compte" }].map((n) => (
                 <Link key={n.href} href={n.href} className="flex items-baseline gap-3 border-b border-ink/10 py-4">
                   <span className="font-mono text-xs text-muted">{n.n}</span>
                   <span className="font-serif text-5xl font-bold uppercase leading-none">{n.label}</span>

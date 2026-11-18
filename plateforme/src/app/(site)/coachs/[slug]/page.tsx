@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CoachCard, CoachPortrait, Label, Pill, Section } from "@/components/site";
+import { CoachCard, CoachPortrait, DisciplineTag, Label, Pill, Section } from "@/components/site";
 import { formatShortDay, formatTime } from "@/lib/dates";
 import { getCoach, getCoaches, getSessions } from "@/lib/site";
 
@@ -38,6 +38,7 @@ export default async function CoachPage({ params }: PageProps<"/coachs/[slug]">)
           <Link href="/coachs" className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted hover:text-ink">← Les coachs</Link>
           <Label className="mt-10">{coach.headline || "Coach Lagree"}</Label>
           <h1 className="mt-5 text-8xl sm:text-9xl">{coach.display_name}</h1>
+          <p className="mt-5 flex flex-wrap gap-2">{coach.disciplines.map((d) => <DisciplineTag key={d} d={d} />)}</p>
 
           {coach.quote && (
             <blockquote className="accent mt-10 border-l border-taupe pl-6 text-3xl leading-snug text-taupe">

@@ -19,6 +19,7 @@ const sessionSchema = z.object({
   teacher: z.string().uuid().or(z.literal("")).transform((v) => v || null),
   capacity: z.coerce.number().int().min(1, "Au moins 1 place").max(50),
   notes: z.string().trim().max(500).optional().transform((v) => v || null),
+  class_type: z.string().uuid().or(z.literal("")).optional().transform((v) => v || null),
 });
 
 const fields = (form: FormData) => Object.fromEntries(form.entries());
@@ -33,6 +34,7 @@ export async function createSessions(_p: ActionResult, form: FormData): Promise<
   const { data, error } = await supabase.rpc("admin_create_sessions", {
     p_title: v.title, p_date: v.date, p_start_time: v.start, p_duration_minutes: v.duration,
     p_teacher_id: v.teacher, p_capacity: v.capacity, p_repeat_weeks: v.repeat, p_notes: v.notes,
+    p_class_type_id: v.class_type,
   });
   if (error) return { ok: false, message: errorMessage(error) };
   revalidatePath("/admin/planning");
@@ -48,7 +50,7 @@ export async function updateSession(_p: ActionResult, form: FormData): Promise<A
   const supabase = await createClient();
   const { error } = await supabase.rpc("admin_update_session", {
     p_session_id: v.id, p_title: v.title, p_date: v.date, p_start_time: v.start, p_duration_minutes: v.duration,
-    p_teacher_id: v.teacher, p_capacity: v.capacity, p_notes: v.notes,
+    p_teacher_id: v.teacher, p_capacity: v.capacity, p_notes: v.notes, p_class_type_id: v.class_type,
   });
   if (error) {
     if (error.message.startsWith("CAPACITY_BELOW_BOOKINGS"))

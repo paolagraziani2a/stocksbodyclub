@@ -51,15 +51,29 @@ const [{ id: lea }] = await as(admin, "insert into public.teachers (display_name
 await as(admin, `insert into public.teacher_pay_rules (teacher_id, mode, percent, valid_from) values
   ($1, 'percent', 40, '2000-01-01'), ($2, 'none', null, '2000-01-01'), ($3, 'percent', 40, '2000-01-01')`, [camille, pao, lea]);
 
-// Planning : semaine dernière → semaine prochaine, 3 créneaux par jour ouvré
-const slots = [["07:30", camille], ["12:30", lea], ["19:00", pao]];
+// Professeures de yoga et de Mat Pilates (fictives)
+const [{ id: marie }] = await as(admin, "insert into public.teachers (display_name, disciplines) values ('Marie', '{yoga}') returning id");
+const [{ id: elise }] = await as(admin, "insert into public.teachers (display_name, disciplines) values ('Élise', '{yoga,mat_pilates}') returning id");
+await as(admin, "update public.teachers set disciplines = '{lagree,mat_pilates}' where id = $1", [lea]);
+await as(admin, `insert into public.teacher_pay_rules (teacher_id, mode, percent, valid_from) values
+  ($1, 'percent', 40, '2000-01-01'), ($2, 'percent', 40, '2000-01-01')`, [marie, elise]);
+
+// Planning type : semaine dernière → semaine prochaine (3 semaines)
+const types = Object.fromEntries((await db.query("select id, name from public.class_types")).rows.map((t) => [t.name, t.id]));
+const week = [
+  // [jour (0 = lundi), heure, cours, professeure]
+  [0, "07:30", "Lagree Full Body Débutant", camille], [0, "12:30", "Lagree Sculpt", lea], [0, "18:30", "Yoga Vinyasa", marie], [0, "19:30", "Lagree Full Body Avancé Intense", pao],
+  [1, "07:30", "Lagree Sculpt", camille], [1, "12:30", "Mat Pilates Sculpt", elise], [1, "19:00", "Lagree Avancé Doux", pao],
+  [2, "07:30", "Lagree Full Body Avancé Intense", camille], [2, "12:30", "Lagree Full Body Débutant", lea], [2, "18:30", "Yoga Doux", elise], [2, "19:30", "Lagree Sculpt", pao],
+  [3, "07:30", "Lagree Avancé Doux", camille], [3, "12:30", "Mat Pilates Sculpt", lea], [3, "19:00", "Lagree Full Body Avancé Intense", pao],
+  [4, "07:30", "Lagree Full Body Débutant", camille], [4, "12:30", "Yoga Vinyasa", marie], [4, "20:00", "Lagree Disco Night", pao],
+  [5, "09:30", "Lagree Sculpt", camille], [5, "11:00", "Yoga Doux", marie],
+];
 const { rows: [{ monday }] } = await db.query("select (date_trunc('week', now() at time zone 'Europe/Paris')::date - 7) as monday");
-for (let d = 0; d < 5; d++) {
-  for (const [time, teacher] of slots) {
-    const day = new Date(monday); day.setDate(day.getDate() + d);
-    await as(admin, "select public.admin_create_sessions('Lagree', $1, $2, 50, $3, 8, null, 3)",
-      [day.toISOString().slice(0, 10), time, teacher]);
-  }
+for (const [d, time, name, teacher] of week) {
+  const day = new Date(monday); day.setDate(day.getDate() + d);
+  await as(admin, "select public.admin_create_sessions(null, $1, $2, null, $3, null, $4, 3)",
+    [day.toISOString().slice(0, 10), time, teacher, types[name]]);
 }
 
 // Clientes et achats (paiements Stripe simulés par le même chemin que le webhook)
@@ -112,6 +126,16 @@ await as(admin, `update public.teachers set headline = 'Coach Lagree certifiée'
   specialties = '{Sculpt,Gainage,Débutantes}', certifications = 'Certification Lagree Fitness (niveau 2)
 Diplôme de danse classique'
   where display_name = 'Camille'`);
+await as(admin, `update public.teachers set headline = 'Professeure de yoga', sort_order = 4,
+  quote = 'Respirer avant de bouger.',
+  bio = 'Marie enseigne un yoga vinyasa fluide et un yoga doux tout en écoute. Ses cours sont une parenthèse pour délier le corps et apaiser le mental.',
+  specialties = '{Vinyasa,Respiration,Mobilité}', certifications = 'Professeure de yoga certifiée (200 h)'
+  where display_name = 'Marie'`);
+await as(admin, `update public.teachers set headline = 'Yoga & Mat Pilates', sort_order = 5,
+  quote = 'La force naît de la douceur.',
+  bio = 'Élise associe le yoga doux et le Pilates au sol pour travailler posture, gainage et souplesse, à un rythme posé.',
+  specialties = '{Yoga doux,Mat Pilates,Posture}', certifications = 'Professeure de yoga (200 h)\nFormation Pilates Mat'
+  where display_name = 'Élise'`);
 await as(admin, `update public.teachers set headline = 'Coach Lagree & préparation physique', sort_order = 2,
   quote = 'Chaque séance vous rend un peu plus forte.',
   bio = 'Léa vient de la préparation physique. Ses cours de midi sont rythmés et efficaces : 50 minutes pour repartir pleine d''énergie.',

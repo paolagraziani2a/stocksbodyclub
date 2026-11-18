@@ -138,6 +138,9 @@ La CI GitHub Actions (`.github/workflows/plateforme.yml`) exécute tout cela à 
       lien de réinitialisation et mot de passe temporaire (les mots de passe ne sont jamais lisibles)
 - [x] SMS d'annulation de cours (Brevo) ; sans clé BREVO_API_KEY, envois simulés et journalisés
 - [x] Séance d'essai 15 € (une par cliente) ; CGV et politique de confidentialité (projets à faire valider)
+- [x] Disciplines : Lagree (5 cours), Yoga (2), Mat Pilates (1) avec niveau, intensité 1–3, durée, places ;
+      page « Les cours », coachs par discipline (section « Professeurs de yoga »), planning filtrable,
+      Admin → Cours proposés ; le type de cours pré-remplit les créneaux
 - [ ] Lot 3 — paiement en ligne Stripe
 - [x] Admin → Cartes & tarifs : prix, nombre de cours et durée de validité modifiables (prochains achats uniquement)
 - [ ] Lot 6 — liste d'attente (emails), confirmations, PWA, tâches planifiées

@@ -8,7 +8,7 @@ import { formatDay, formatTime, mondayOf, parisDay, parisTime } from "@/lib/date
 import { formatPhone } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 import { cancelSession, deleteSession, setAttendance, updateSession } from "../actions";
-import { SessionFields, type TeacherOption } from "../session-fields";
+import { SessionFields, type TeacherOption, type TypeOption } from "../session-fields";
 
 export const metadata: Metadata = { title: "Cours" };
 
@@ -32,9 +32,10 @@ export default async function SessionPage({ params, searchParams }: PageProps<"/
   const sp = await searchParams;
   const num = (v: unknown) => (typeof v === "string" && /^\d+$/.test(v) ? Number(v) : 0);
   const supabase = await createClient();
-  const [{ data: s }, { data: teachers }, { data: roster }, { count: waitlist }, { data: sms }] = await Promise.all([
+  const [{ data: s }, { data: teachers }, { data: types }, { data: roster }, { count: waitlist }, { data: sms }] = await Promise.all([
     supabase.from("class_sessions").select("*, teachers(display_name)").eq("id", id).maybeSingle(),
-    supabase.from("teachers").select("id, display_name").eq("active", true).order("display_name").returns<TeacherOption[]>(),
+    supabase.from("teachers").select("id, display_name, disciplines").eq("active", true).order("display_name").returns<TeacherOption[]>(),
+    supabase.from("class_types").select("id, name, discipline, duration_minutes, default_capacity").eq("active", true).order("sort_order").returns<TypeOption[]>(),
     supabase.rpc("session_roster", { p_session_id: id }),
     supabase.from("waitlist_entries").select("id", { count: "exact", head: true }).eq("session_id", id).eq("status", "waiting"),
     supabase.from("notification_log").select("id, recipient, status, error, created_at, profiles(first_name, last_name)")
@@ -105,7 +106,8 @@ export default async function SessionPage({ params, searchParams }: PageProps<"/
               <input type="hidden" name="id" value={s.id} />
               <SessionFields
                 teachers={teachers ?? []}
-                defaults={{ title: s.title, date: parisDay(s.starts_at), start: parisTime(s.starts_at), duration,
+                types={types ?? []}
+                defaults={{ typeId: s.class_type_id, title: s.title, date: parisDay(s.starts_at), start: parisTime(s.starts_at), duration,
                             teacher: s.teacher_id, capacity: s.capacity, notes: s.notes }}
               />
               <SubmitButton className="mt-4">Enregistrer</SubmitButton>

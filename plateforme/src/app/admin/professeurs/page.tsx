@@ -5,6 +5,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Field, Input, PageHeader, Select } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
+import { DISCIPLINE_ORDER, DISCIPLINES, type Discipline } from "@/lib/format";
 import { formatEuros } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { createTeacher, setPayRule, setTeacherActive } from "./actions";
@@ -12,7 +13,7 @@ import { createTeacher, setPayRule, setTeacherActive } from "./actions";
 export const metadata: Metadata = { title: "Professeurs" };
 
 type Rule = { mode: "percent" | "fixed_per_class" | "per_attendee" | "none"; percent: number | null; fixed_cents: number | null; per_attendee_cents: number | null; valid_from: string };
-type Teacher = { id: string; display_name: string; headline: string; photo_url: string | null; active: boolean; teacher_pay_rules: Rule[] };
+type Teacher = { id: string; display_name: string; headline: string; photo_url: string | null; active: boolean; disciplines: Discipline[]; teacher_pay_rules: Rule[] };
 
 function describe(r?: Rule) {
   if (!r) return "Aucune règle";
@@ -50,7 +51,7 @@ export default async function TeachersPage() {
   const supabase = await createClient();
   const [{ data: teachers }, { data: settings }] = await Promise.all([
     supabase.from("teachers")
-      .select("id, display_name, headline, photo_url, active, teacher_pay_rules(mode, percent, fixed_cents, per_attendee_cents, valid_from)")
+      .select("id, display_name, headline, photo_url, active, disciplines, teacher_pay_rules(mode, percent, fixed_cents, per_attendee_cents, valid_from)")
       .order("active", { ascending: false }).order("display_name").returns<Teacher[]>(),
     supabase.from("studio_settings").select("teacher_pay_base, late_cancel_counts_for_teacher").single(),
   ]);
@@ -75,7 +76,7 @@ export default async function TeachersPage() {
                     <CoachPortrait coach={t} small className="h-14 w-14 shrink-0 rounded-full" />
                     <div>
                       <h2 className="text-2xl">{t.display_name}</h2>
-                      <p className="mt-0.5 text-sm text-muted">{describe(current)}</p>
+                      <p className="mt-0.5 text-sm text-muted">{t.disciplines.map((d) => DISCIPLINES[d].label).join(" · ")} — {describe(current)}</p>
                       <Link href={`/admin/professeurs/${t.id}`} className="mt-1 inline-block text-sm text-taupe-deep underline decoration-line underline-offset-4">
                         {t.headline || t.photo_url ? "Modifier le profil public" : "Créer son profil public (photo, présentation)"}
                       </Link>
@@ -112,6 +113,11 @@ export default async function TeachersPage() {
           <h2 className="text-2xl">Ajouter un professeur</h2>
           <ActionForm action={createTeacher} className="mt-6 flex flex-col gap-4">
             <Field label="Nom affiché"><Input name="name" required maxLength={60} placeholder="Ex. Camille" /></Field>
+            <Field label="Discipline" hint="D'autres disciplines peuvent être ajoutées dans son profil">
+              <Select name="discipline" defaultValue="lagree">
+                {DISCIPLINE_ORDER.map((d) => <option key={d} value={d}>{d === "lagree" ? "Coach Lagree" : d === "yoga" ? "Professeur de yoga" : "Professeur de Mat Pilates"}</option>)}
+              </Select>
+            </Field>
             <ModeFields />
             <SubmitButton>Ajouter</SubmitButton>
           </ActionForm>

@@ -5,6 +5,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { CoachPortrait } from "@/components/site";
 import { Card, Field, Input, PageHeader, Textarea, buttonStyles } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
+import { DISCIPLINE_ORDER, DISCIPLINES } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { saveTeacherProfile } from "./actions";
 
@@ -15,7 +16,7 @@ export default async function TeacherProfilePage({ params }: PageProps<"/admin/p
   const { id } = await params;
   const supabase = await createClient();
   const { data: t } = await supabase.from("teachers")
-    .select("id, slug, display_name, headline, quote, bio, photo_url, specialties, certifications, instagram_url, show_on_site, sort_order, active")
+    .select("id, slug, display_name, headline, quote, bio, photo_url, specialties, certifications, instagram_url, show_on_site, sort_order, active, disciplines")
     .eq("id", id).maybeSingle();
   if (!t) notFound();
 
@@ -54,7 +55,18 @@ export default async function TeacherProfilePage({ params }: PageProps<"/admin/p
         <Card>
           <div className="grid gap-5 sm:grid-cols-2">
             <Field label="Nom affiché"><Input name="display_name" defaultValue={t.display_name} required maxLength={60} /></Field>
-            <Field label="Titre" hint="Ex. Coach Lagree certifiée"><Input name="headline" defaultValue={t.headline} maxLength={80} /></Field>
+            <Field label="Titre" hint="Ex. Coach Lagree certifiée, Professeure de yoga"><Input name="headline" defaultValue={t.headline} maxLength={80} /></Field>
+            <fieldset className="sm:col-span-2">
+              <legend className="text-xs uppercase tracking-[0.15em] text-muted">Disciplines enseignées</legend>
+              <div className="mt-2 flex flex-wrap gap-4">
+                {DISCIPLINE_ORDER.map((d) => (
+                  <label key={d} className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="disciplines" value={d} defaultChecked={(t.disciplines as string[]).includes(d)} className="h-4 w-4" />
+                    {DISCIPLINES[d].label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <Field label="Citation" hint="Une phrase qui lui ressemble" className="sm:col-span-2">
               <Input name="quote" defaultValue={t.quote} maxLength={200} />
             </Field>

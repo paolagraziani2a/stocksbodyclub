@@ -19,16 +19,20 @@ const schema = z.object({
   sort_order: z.coerce.number().int().min(0).max(999).default(0),
   show_on_site: z.preprocess((v) => v === "on", z.boolean()),
 });
+const disciplinesSchema = z.array(z.enum(["lagree", "yoga", "mat_pilates"])).min(1, "Cochez au moins une discipline.");
 
 export async function saveTeacherProfile(_p: ActionResult, form: FormData): Promise<ActionResult> {
   await requireAdmin();
   const parsed = schema.safeParse(Object.fromEntries(form.entries()));
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
   const { id, specialties, ...rest } = parsed.data;
+  const disciplines = disciplinesSchema.safeParse(form.getAll("disciplines"));
+  if (!disciplines.success) return { ok: false, message: disciplines.error.issues[0].message };
 
   const supabase = await createClient();
   const update: Record<string, unknown> = {
     ...rest,
+    disciplines: disciplines.data,
     bio: rest.bio || null,
     // « Sculpt, Core , Débutantes » → ["Sculpt", "Core", "Débutantes"]
     specialties: specialties.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 8),

@@ -451,3 +451,31 @@ describe("Catalogue du studio", () => {
     await asUser(admin, (c) => c.query("update public.products set validity_value = 1 where id = $1", [id]));
   });
 });
+
+describe("Disciplines et cours proposés", () => {
+  it("le catalogue contient les 8 cours du studio, répartis en 3 disciplines", async () => {
+    const { rows } = await pool.query("select discipline, count(*)::int as n from public.class_types group by discipline order by discipline");
+    expect(Object.fromEntries(rows.map((r) => [r.discipline, r.n]))).toEqual({ lagree: 5, mat_pilates: 1, yoga: 2 });
+    const { rows: [t] } = await pool.query("select slug from public.class_types where name = 'Lagree Full Body Avancé Intense'");
+    expect(t.slug).toBe("lagree-full-body-avance-intense");
+  });
+
+  it("créer un cours depuis un type reprend son nom, sa durée et sa capacité", async () => {
+    const { rows: [yoga] } = await pool.query("select id from public.class_types where name = 'Yoga Vinyasa'");
+    const [s] = await asUser(await getAdmin(), async (c) => (await c.query(
+      "select * from public.admin_create_sessions(null, current_date + 3, '18:00', null, null, null, $1)", [yoga.id])).rows);
+    expect(s.title).toBe("Yoga Vinyasa");
+    expect(s.capacity).toBe(12);
+    expect((new Date(s.ends_at).getTime() - new Date(s.starts_at).getTime()) / 60000).toBe(60);
+  });
+
+  it("un professeur enseigne une ou plusieurs disciplines connues, visibles publiquement", async () => {
+    const t = await createTeacher();
+    await pool.query("update public.teachers set disciplines = '{yoga,mat_pilates}' where id = $1", [t]);
+    expect(await errorOf(pool.query("update public.teachers set disciplines = '{boxe}' where id = $1", [t]))).toMatch(/check constraint/);
+    expect(await errorOf(pool.query("update public.teachers set disciplines = '{}' where id = $1", [t]))).toMatch(/check constraint/);
+    await asUser(null, async (c) => {
+      expect((await c.query("select disciplines from public.teachers where id = $1", [t])).rows[0].disciplines).toEqual(["yoga", "mat_pilates"]);
+    });
+  });
+});

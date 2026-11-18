@@ -24,13 +24,15 @@ function toRule(mode: z.infer<typeof ruleSchema>["mode"], value: number) {
 
 export async function createTeacher(_p: ActionResult, form: FormData): Promise<ActionResult> {
   await requireAdmin();
-  const parsed = ruleSchema.extend({ name: z.string().trim().min(1, "Indiquez un nom").max(60) })
-    .safeParse(Object.fromEntries(form.entries()));
+  const parsed = ruleSchema.extend({
+    name: z.string().trim().min(1, "Indiquez un nom").max(60),
+    discipline: z.enum(["lagree", "yoga", "mat_pilates"]),
+  }).safeParse(Object.fromEntries(form.entries()));
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
-  const { name, mode, value } = parsed.data;
+  const { name, mode, value, discipline } = parsed.data;
 
   const supabase = await createClient();
-  const { data: t, error } = await supabase.from("teachers").insert({ display_name: name }).select("id").single();
+  const { data: t, error } = await supabase.from("teachers").insert({ display_name: name, disciplines: [discipline] }).select("id").single();
   if (error) return { ok: false, message: errorMessage(error) };
   const { error: e2 } = await supabase.from("teacher_pay_rules")
     .insert({ teacher_id: t.id, valid_from: "2000-01-01", ...toRule(mode, value) });
