@@ -2,21 +2,24 @@
 
 /*
  * THE BODY CLUB — charte
- * Ivoire, sable et taupe rosé ; une serif élégante pour les titres,
- * une sans-serif sobre pour le texte. Beaucoup d'air, peu d'ornements.
+ * Les couleurs de base sont modifiables depuis Admin → Apparence
+ * (injectées par le layout racine). Les teintes dérivées sont calculées ici.
  */
 :root {
   --ivory: #faf7f2;
   --sand: #f1ebe3;
-  --linen: #e7ddd1;
-  --blush: #e8d5cb;
   --taupe: #9c7f70;
-  --taupe-deep: #7a5f52;
   --ink: #2a2421;
   --muted: #7b716b;
   --line: #e4dcd2;
+  --taupe-deep: color-mix(in srgb, var(--taupe) 72%, black);
+  --blush: color-mix(in srgb, var(--taupe) 28%, var(--ivory));
+  --linen: color-mix(in srgb, var(--sand) 70%, var(--taupe));
   --danger: #a5483a;
   --success: #5f7a5a;
+  --btn-radius: 9999px;
+  --heading-font: var(--font-cormorant);
+  --body-font: var(--font-jost);
 }
 
 @theme inline {
@@ -31,19 +34,28 @@
   --color-line: var(--line);
   --color-danger: var(--danger);
   --color-success: var(--success);
-  --font-serif: var(--font-cormorant), Georgia, serif;
-  --font-sans: var(--font-jost), system-ui, sans-serif;
+  --font-serif: var(--heading-font), Georgia, serif;
+  --font-sans: var(--body-font), system-ui, sans-serif;
 }
 
 body {
   background: var(--ivory);
   color: var(--ink);
-  font-family: var(--font-sans);
+  font-family: var(--body-font), system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 
 h1, h2, h3 {
-  font-family: var(--font-serif);
+  font-family: var(--heading-font), Georgia, serif;
   font-weight: 500;
   letter-spacing: 0.01em;
+}
+
+.btn {
+  border-radius: var(--btn-radius);
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
 }

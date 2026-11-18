@@ -154,7 +154,7 @@ grant execute on function public.set_attendance(uuid, public.booking_status)   t
 grant execute on function public.admin_book_session(uuid, uuid)                to authenticated;
 grant execute on function public.admin_cancel_booking(uuid, boolean)           to authenticated;
 grant execute on function public.admin_cancel_session(uuid, text)              to authenticated;
-grant execute on function public.admin_grant_pass(uuid, text, integer, integer, public.validity_unit, numeric, uuid, text, timestamptz, timestamptz, public.pass_source, integer) to authenticated;
+grant execute on function public.admin_grant_pass(uuid, text, integer, integer, public.validity_unit, numeric, uuid, text, timestamptz, timestamptz, public.pass_source, integer, numeric) to authenticated;
 grant execute on function public.admin_adjust_pass(uuid, integer, text)        to authenticated;
 grant execute on function public.admin_set_pass_expiry(uuid, timestamptz, text) to authenticated;
 grant execute on function public.admin_set_role(uuid, public.app_role)         to authenticated;

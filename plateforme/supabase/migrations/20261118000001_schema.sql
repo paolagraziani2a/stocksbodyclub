@@ -45,6 +45,15 @@ create table public.studio_settings (
   late_cancel_counts_for_teacher boolean not null default true,
   no_show_counts_for_teacher     boolean not null default true,
   waitlist_enabled               boolean not null default true,
+  -- abonnement illimité : nombre max d'annulations tardives consécutives
+  unlimited_late_cancel_limit    integer not null default 2 check (unlimited_late_cancel_limit >= 0),
+  -- mentions obligatoires des factures
+  legal_name                     text    not null default 'The Body Club',
+  legal_form                     text    not null default '',
+  legal_address                  text    not null default '',
+  siret                          text    not null default '',
+  vat_number                     text    not null default '',
+  invoice_footer                 text    not null default 'Paiement reçu par carte bancaire. Pas d''escompte pour paiement anticipé.',
   updated_at                     timestamptz not null default now()
 );
 insert into public.studio_settings (id) values (true);
@@ -145,14 +154,20 @@ create table public.products (
   id             uuid primary key default gen_random_uuid(),
   name           text not null,
   description    text,
-  credits        integer not null check (credits > 0),
+  credits        integer not null check (credits >= 0),
   price_cents    integer not null check (price_cents >= 0),
   validity_value integer not null check (validity_value > 0),
   validity_unit  public.validity_unit not null default 'month',
+  -- abonnement illimité : pas de crédits, validité dès l'achat
+  is_unlimited   boolean not null default false,
+  -- illimité : valeur d'un cours (CA consommé et rémunération des professeurs)
+  class_value_cents integer check (class_value_cents is null or class_value_cents >= 0),
   active         boolean not null default true,
   sort_order     integer not null default 0,
   created_at     timestamptz not null default now(),
-  updated_at     timestamptz not null default now()
+  updated_at     timestamptz not null default now(),
+  check (is_unlimited or credits > 0),
+  check (not is_unlimited or class_value_cents is not null)
 );
 
 create table public.orders (
@@ -164,7 +179,9 @@ create table public.orders (
   stripe_payment_intent_id   text unique,
   -- instantané du produit au moment de l'achat
   product_name               text not null,
-  credits                    integer not null check (credits > 0),
+  credits                    integer not null check (credits >= 0),
+  is_unlimited               boolean not null default false,
+  class_value_cents          integer,
   validity_value             integer not null check (validity_value > 0),
   validity_unit              public.validity_unit not null,
   amount_subtotal_cents      integer not null check (amount_subtotal_cents >= 0),
@@ -203,10 +220,14 @@ create table public.passes (
   order_id          uuid unique references public.orders (id) on delete restrict,
   source            public.pass_source not null,
   name              text not null,
-  credits_total     integer not null check (credits_total > 0),
+  is_unlimited      boolean not null default false,
+  credits_total     integer not null check (credits_total >= 0),
   credits_remaining integer not null check (credits_remaining >= 0),
   -- valeur TTC d'un crédit = prix payé / nombre de crédits (après remise)
   unit_value_cents  numeric(12,4) not null default 0 check (unit_value_cents >= 0),
+  -- valeur d'un crédit pour la rémunération des professeurs : prix public,
+  -- même si la carte est offerte ou remisée
+  pay_unit_value_cents numeric(12,4) not null default 0 check (pay_unit_value_cents >= 0),
   validity_value    integer not null check (validity_value > 0),
   validity_unit     public.validity_unit not null,
   -- la validité démarre à la première réservation (réglage studio)
@@ -216,6 +237,7 @@ create table public.passes (
   note              text,
   created_at        timestamptz not null default now(),
   check (credits_remaining <= credits_total),
+  check (is_unlimited or credits_total > 0),
   check ((activated_at is null) = (expires_at is null))
 );
 create index passes_user_idx on public.passes (user_id, created_at);
@@ -231,6 +253,9 @@ create table public.bookings (
   pass_id      uuid references public.passes (id) on delete restrict,
   status       public.booking_status not null default 'booked',
   credits_used integer not null default 1 check (credits_used >= 0),
+  -- valeur réellement payée (CA consommé) et valeur pour la rémunération du professeur
+  value_cents     numeric(12,4) not null default 0,
+  pay_value_cents numeric(12,4) not null default 0,
   created_by   uuid references public.profiles (id),
   cancelled_at timestamptz,
   created_at   timestamptz not null default now(),

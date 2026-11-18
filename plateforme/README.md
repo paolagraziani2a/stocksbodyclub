@@ -18,7 +18,11 @@ Stripe, professeurs et tableau de bord, pour le studio de Lagree The Body Club.
 | Fin de validité | minuit (Paris) le lendemain de la date anniversaire | `compute_expiry()` |
 | Liste d'attente | notification simple, la première qui réserve a la place | `studio_settings.waitlist_enabled` |
 | Prix | TTC, TVA 20 % | `products`, `studio_settings.vat_rate` |
-| Rémunération des professeurs | 40 % de la valeur des crédits consommés ; Pao : 0 % (le studio garde 100 %) | `teacher_pay_rules` |
+| Rémunération des professeurs | 40 % de la valeur **HT** des cours ; Pao : 0 % (le studio garde 100 %) | Admin → Professeurs / Réglages |
+| Carte offerte ou remisée | le professeur est payé sur le **prix public** | `passes.pay_unit_value_cents` |
+| Abonnement illimité | 280 € / mois, valable dès le paiement ; 1 cours = 25 € (CA et rémunération) | `products.class_value_cents` |
+| Illimité : annulations tardives | 2 d'affilée maximum, la 3ᵉ est refusée ; un cours suivi remet à zéro | Admin → Réglages |
+| Factures | émises automatiquement, numérotation continue F2026-00001 ; avoirs A2026-00001 | Admin → Réglages (mentions) |
 
 | Carte | Prix TTC | Prix / cours | Validité |
 |---|---|---|---|
@@ -26,6 +30,7 @@ Stripe, professeurs et tableau de bord, pour le studio de Lagree The Body Club.
 | 3 cours | 99 € | 33 € | 1 mois |
 | 5 cours | 150 € | 30 € | 1 mois |
 | 10 cours | 250 € | 25 € | 2 mois |
+| Illimité | 280 € | — | 1 mois (dès le paiement) |
 
 ## Architecture
 
@@ -83,6 +88,15 @@ npm install
 npm run dev
 ```
 
+### Supabase local et données de démonstration
+
+```bash
+npx supabase start          # Docker requis
+npx supabase db reset       # applique migrations + seed
+npm run demo                # admin pao@bodyclub.test / bodyclub-demo
+npm run dev                 # http://localhost:3000/admin
+```
+
 ### Tests
 
 Les tests de base de données ont besoin d'un PostgreSQL 16 local
@@ -104,7 +118,10 @@ La CI GitHub Actions (`.github/workflows/plateforme.yml`) exécute tout cela à 
 - [x] Lot 1 — schéma, RLS, fonctions métier, 46 tests SQL
 - [ ] Lot 2 — authentification, planning, réservation / annulation, espace cliente
 - [ ] Lot 3 — Stripe Checkout (test), webhook, codes promo, remboursements
-- [ ] Lot 4 — administration : planning et séries, clientes, produits
-- [ ] Lot 5 — professeurs, rémunérations, tableau de bord
+- [x] Administration : tableau de bord (CA jour/semaine/mois/période, meilleures clientes, rémunération par coach),
+      planning (création rapide, professeur, séries, duplication de semaine, présences, annulation),
+      paiements & factures (liens Stripe, export CSV), professeurs, apparence du site, réglages
+- [x] Factures et avoirs, abonnement illimité, cartes offertes, 73 tests
+- [ ] Lot 4 — administration : fiches clientes, produits
 - [ ] Lot 6 — liste d'attente (emails), confirmations, PWA, tâches planifiées
 - [ ] Lot 7 — import bsport, sauvegardes, mise en production

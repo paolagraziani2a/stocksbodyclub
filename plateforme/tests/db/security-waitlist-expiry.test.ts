@@ -30,7 +30,7 @@ describe("Sécurité (RLS et droits)", () => {
     await createSession();
     await asUser(null, async (c) => {
       expect((await c.query("select count(*)::int as n from public.class_sessions")).rows[0].n).toBeGreaterThan(0);
-      expect((await c.query("select count(*)::int as n from public.products")).rows[0].n).toBe(4);
+      expect((await c.query("select count(*)::int as n from public.products")).rows[0].n).toBe(5);
     });
     expect(await errorOf(asUser(null, (c) => c.query("select * from public.bookings")))).toMatch(/permission denied/);
     expect(await errorOf(asUser(null, (c) => c.query("select public.book_session(gen_random_uuid())")))).toMatch(/permission denied/);

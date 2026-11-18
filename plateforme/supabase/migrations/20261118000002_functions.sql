@@ -65,6 +65,7 @@ declare
   v_settings public.studio_settings := public._settings();
   v_pass     public.passes;
   v_booking  public.bookings;
+  v_cost     integer;
 begin
   if p_user_id is null then
     raise exception 'NOT_AUTHENTICATED' using errcode = '42501';
@@ -97,9 +98,26 @@ begin
     raise exception 'SESSION_FULL';
   end if;
 
-  -- 3. choix de la carte : d'abord une carte active qui expire le plus tôt…
+  -- 3. abonnement illimité actif qui couvre la date du cours : aucun crédit débité
   select * into v_pass from public.passes
   where user_id = p_user_id
+    and is_unlimited
+    and revoked_at is null
+    and activated_at <= now()
+    and expires_at > v_session.starts_at
+  order by expires_at desc
+  limit 1
+  for update;
+
+  if found then
+    v_cost := 0;
+  else
+  v_cost := v_session.credit_cost;
+
+  -- 4. sinon une carte active qui expire le plus tôt…
+  select * into v_pass from public.passes
+  where user_id = p_user_id
+    and not is_unlimited
     and revoked_at is null
     and activated_at is not null
     and expires_at > now()
@@ -112,6 +130,7 @@ begin
   if not found then
     select * into v_pass from public.passes
     where user_id = p_user_id
+      and not is_unlimited
       and revoked_at is null
       and activated_at is null
       and credits_remaining >= v_session.credit_cost
@@ -127,17 +146,21 @@ begin
     where id = v_pass.id
     returning * into v_pass;
   end if;
+  end if;
 
-  -- 4. écritures
-  update public.passes set credits_remaining = credits_remaining - v_session.credit_cost
-  where id = v_pass.id;
-
-  insert into public.bookings (session_id, user_id, pass_id, status, credits_used, created_by)
-  values (p_session_id, p_user_id, v_pass.id, 'booked', v_session.credit_cost, p_actor_id)
+  -- 5. écritures (valeurs figées : CA consommé et base de rémunération du professeur)
+  insert into public.bookings (session_id, user_id, pass_id, status, credits_used, value_cents, pay_value_cents, created_by)
+  values (p_session_id, p_user_id, v_pass.id, 'booked', v_cost,
+          v_pass.unit_value_cents * greatest(v_cost, 1),
+          v_pass.pay_unit_value_cents * greatest(v_cost, 1),
+          p_actor_id)
   returning * into v_booking;
 
-  insert into public.credit_ledger (user_id, pass_id, booking_id, delta, reason, unit_value_cents, actor_id)
-  values (p_user_id, v_pass.id, v_booking.id, -v_session.credit_cost, 'booking', v_pass.unit_value_cents, p_actor_id);
+  if v_cost > 0 then
+    update public.passes set credits_remaining = credits_remaining - v_cost where id = v_pass.id;
+    insert into public.credit_ledger (user_id, pass_id, booking_id, delta, reason, unit_value_cents, actor_id)
+    values (p_user_id, v_pass.id, v_booking.id, -v_cost, 'booking', v_pass.unit_value_cents, p_actor_id);
+  end if;
 
   update public.class_sessions set booked_count = booked_count + 1 where id = p_session_id;
 
@@ -160,6 +183,33 @@ language plpgsql security definer set search_path = public as $$
 begin
   perform public._require_admin();
   return public._book_session(p_session_id, p_user_id, auth.uid(), true);
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- Abonnement illimité : nombre d'annulations tardives consécutives de la cliente
+-- (dans l'ordre des cours, du plus récent au plus ancien). Un cours suivi
+-- remet le compteur à zéro ; les annulations dans le délai et les absences
+-- sont neutres.
+-- ---------------------------------------------------------------------------
+create or replace function public.late_cancel_streak(p_user_id uuid) returns integer
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_row    record;
+  v_streak integer := 0;
+begin
+  for v_row in
+    select b.status
+    from public.bookings b
+    join public.class_sessions s on s.id = b.session_id
+    join public.passes p on p.id = b.pass_id
+    where b.user_id = p_user_id and p.is_unlimited
+      and (b.status in ('late_cancelled', 'attended') or (b.status = 'booked' and s.starts_at <= now()))
+    order by s.starts_at desc
+  loop
+    exit when v_row.status <> 'late_cancelled';
+    v_streak := v_streak + 1;
+  end loop;
+  return v_streak;
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -200,6 +250,13 @@ begin
 
   v_in_time := now() <= v_session.starts_at - make_interval(hours => v_settings.cancel_window_hours);
   v_refund  := coalesce(p_force_refund, v_in_time);
+
+  -- illimité : pas plus de N annulations tardives d'affilée (l'admin peut passer outre)
+  if not v_in_time and not p_is_admin and exists (
+    select 1 from public.passes where id = v_booking.pass_id and is_unlimited
+  ) and public.late_cancel_streak(v_booking.user_id) >= v_settings.unlimited_late_cancel_limit then
+    raise exception 'LATE_CANCEL_LIMIT';
+  end if;
 
   update public.bookings
   set status = case when v_refund then 'cancelled'::public.booking_status else 'late_cancelled'::public.booking_status end,
@@ -390,9 +447,10 @@ begin
   select * into v_product from public.products where id = p_product_id and active;
   if not found then raise exception 'PRODUCT_NOT_AVAILABLE'; end if;
 
-  insert into public.orders (user_id, product_id, product_name, credits, validity_value, validity_unit, amount_subtotal_cents)
-  values (auth.uid(), v_product.id, v_product.name, v_product.credits, v_product.validity_value,
-          v_product.validity_unit, v_product.price_cents)
+  insert into public.orders (user_id, product_id, product_name, credits, is_unlimited, class_value_cents,
+                             validity_value, validity_unit, amount_subtotal_cents)
+  values (auth.uid(), v_product.id, v_product.name, v_product.credits, v_product.is_unlimited,
+          v_product.class_value_cents, v_product.validity_value, v_product.validity_unit, v_product.price_cents)
   returning * into v_order;
   return v_order;
 end $$;
@@ -450,15 +508,30 @@ begin
   where id = v_order.id
   returning * into v_order;
 
-  insert into public.passes (user_id, product_id, order_id, source, name, credits_total, credits_remaining,
-                             unit_value_cents, validity_value, validity_unit)
-  values (v_order.user_id, v_order.product_id, v_order.id, 'stripe', v_order.product_name, v_order.credits,
-          v_order.credits, round(p_amount_total_cents::numeric / v_order.credits, 4),
-          v_order.validity_value, v_order.validity_unit)
-  returning * into v_pass;
+  if v_order.is_unlimited then
+    -- abonnement : valable dès le paiement ; un cours vaut class_value_cents
+    insert into public.passes (user_id, product_id, order_id, source, name, is_unlimited, credits_total,
+                               credits_remaining, unit_value_cents, pay_unit_value_cents,
+                               validity_value, validity_unit, activated_at, expires_at)
+    values (v_order.user_id, v_order.product_id, v_order.id, 'stripe', v_order.product_name, true, 0, 0,
+            v_order.class_value_cents, v_order.class_value_cents, v_order.validity_value, v_order.validity_unit,
+            now(), public.compute_expiry(now(), v_order.validity_value, v_order.validity_unit, (public._settings()).timezone))
+    returning * into v_pass;
+  else
+    -- carte : valeur réelle = prix payé (remise déduite) ; valeur prof = prix public
+    insert into public.passes (user_id, product_id, order_id, source, name, credits_total, credits_remaining,
+                               unit_value_cents, pay_unit_value_cents, validity_value, validity_unit)
+    values (v_order.user_id, v_order.product_id, v_order.id, 'stripe', v_order.product_name, v_order.credits,
+            v_order.credits, round(p_amount_total_cents::numeric / v_order.credits, 4),
+            round(p_amount_subtotal_cents::numeric / v_order.credits, 4),
+            v_order.validity_value, v_order.validity_unit)
+    returning * into v_pass;
 
-  insert into public.credit_ledger (user_id, pass_id, delta, reason, unit_value_cents)
-  values (v_order.user_id, v_pass.id, v_pass.credits_total, 'purchase', v_pass.unit_value_cents);
+    insert into public.credit_ledger (user_id, pass_id, delta, reason, unit_value_cents)
+    values (v_order.user_id, v_pass.id, v_pass.credits_total, 'purchase', v_pass.unit_value_cents);
+  end if;
+
+  perform public._issue_invoice_for_order(v_order.id);
 
   update public.stripe_events set processed_at = now() where id = p_event_id;
   return jsonb_build_object('status', 'credited', 'order_id', v_order.id, 'pass_id', v_pass.id);
@@ -531,6 +604,8 @@ begin
   values (v_order.id, p_stripe_refund_id, p_amount_cents, v_remove, p_reason, p_actor_id)
   returning id into v_refund_id;
 
+  perform public._issue_credit_note(v_refund_id);
+
   update public.orders set
     amount_refunded_cents = amount_refunded_cents + p_amount_cents,
     status = case when v_full then 'refunded'::public.order_status else 'partially_refunded'::public.order_status end
@@ -589,12 +664,16 @@ create or replace function public.admin_grant_pass(
   p_activated_at     timestamptz default null,
   p_expires_at       timestamptz default null,
   p_source           public.pass_source default 'admin',
-  p_credits_remaining integer default null
+  p_credits_remaining integer default null,
+  -- valeur d'un crédit pour la rémunération des professeurs. Par défaut :
+  -- prix public du produit choisi (une carte offerte rémunère comme une carte payée)
+  p_pay_unit_value_cents numeric default null
 ) returns public.passes
 language plpgsql security definer set search_path = public as $$
 declare
   v_pass public.passes;
   v_remaining integer := coalesce(p_credits_remaining, p_credits);
+  v_pay numeric;
 begin
   perform public._require_admin();
   if p_source = 'stripe' then raise exception 'INVALID_SOURCE'; end if;
@@ -604,10 +683,16 @@ begin
   perform 1 from public.profiles where id = p_user_id for update;
   if not found then raise exception 'USER_NOT_FOUND'; end if;
 
+  v_pay := coalesce(
+    p_pay_unit_value_cents,
+    (select round(price_cents::numeric / nullif(credits, 0), 4) from public.products where id = p_product_id),
+    p_unit_value_cents,
+    0);
+
   insert into public.passes (user_id, product_id, source, name, credits_total, credits_remaining, unit_value_cents,
-                             validity_value, validity_unit, activated_at, expires_at, note)
+                             pay_unit_value_cents, validity_value, validity_unit, activated_at, expires_at, note)
   values (p_user_id, p_product_id, p_source, p_name, p_credits, v_remaining, coalesce(p_unit_value_cents, 0),
-          p_validity_value, p_validity_unit, p_activated_at, p_expires_at, p_note)
+          v_pay, p_validity_value, p_validity_unit, p_activated_at, p_expires_at, p_note)
   returning * into v_pass;
 
   if v_remaining > 0 then
@@ -687,12 +772,13 @@ end $$;
 
 -- Solde de crédits utilisable maintenant, par cliente
 create or replace function public.my_credit_balance() returns table (
-  usable_credits integer, next_expiry timestamptz
+  usable_credits integer, next_expiry timestamptz, unlimited_until timestamptz
 )
 language sql stable security definer set search_path = public as $$
   select
-    coalesce(sum(credits_remaining) filter (where expires_at is null or expires_at > now()), 0)::integer,
-    min(expires_at) filter (where expires_at > now() and credits_remaining > 0)
+    coalesce(sum(credits_remaining) filter (where not is_unlimited and (expires_at is null or expires_at > now())), 0)::integer,
+    min(expires_at) filter (where not is_unlimited and expires_at > now() and credits_remaining > 0),
+    max(expires_at) filter (where is_unlimited and expires_at > now())
   from public.passes
   where user_id = auth.uid() and revoked_at is null
 $$;
