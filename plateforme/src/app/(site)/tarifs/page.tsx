@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Kicker, ProductCard, Section } from "@/components/site";
+import { Display, Label, ProductCard, Section } from "@/components/site";
 import { getProducts } from "@/lib/site";
 import { createClient } from "@supabase/supabase-js";
 import { publicEnv } from "@/lib/env";
@@ -20,9 +20,9 @@ export default async function PricesPage() {
   return (
     <main>
       <Section className="pb-10 text-center sm:pb-14">
-        <Kicker>Tarifs</Kicker>
-        <h1 className="mt-4 text-6xl sm:text-7xl">Choisissez votre rythme</h1>
-        <p className="mx-auto mt-6 max-w-lg text-lg font-light leading-relaxed text-muted">
+        <Label n="03">Tarifs</Label>
+        <Display as="h1" main="Votre" accent="rythme." className="mt-6" />
+        <p className="mx-auto mt-8 max-w-lg leading-relaxed text-muted">
           Des cartes sans engagement, valables à partir de votre premier cours, ou l&apos;illimité pour venir aussi souvent que vous le souhaitez.
         </p>
       </Section>
@@ -52,7 +52,7 @@ export default async function PricesPage() {
 function Rule({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="border-t border-ink pt-6">
-      <h2 className="text-2xl">{title}</h2>
+      <h2 className="text-4xl">{title}</h2>
       <p className="mt-3 text-sm leading-relaxed text-muted">{children}</p>
     </div>
   );

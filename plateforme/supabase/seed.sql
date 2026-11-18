@@ -14,5 +14,9 @@ insert into public.products (name, description, credits, price_cents, validity_v
                              is_unlimited, class_value_cents, sort_order)
 values ('Illimité', 'Cours illimités pendant 1 mois.', 0, 28000, 1, 'month', true, 2500, 5);
 
+-- Séance d'essai (tarif affiché sur le site du club) : une seule par cliente
+insert into public.products (name, description, credits, price_cents, validity_value, validity_unit, max_per_client, sort_order)
+values ('Séance d''essai', 'Votre premier cours de Lagree.', 1, 1500, 1, 'month', 1, 0);
+
 insert into public.class_types (name, description, duration_minutes, default_capacity)
 values ('Lagree', 'Cours de Lagree sur Megaformer.', 50, 8);

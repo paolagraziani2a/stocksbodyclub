@@ -1,25 +1,32 @@
 @import "tailwindcss";
 
 /*
- * THE BODY CLUB — charte
- * Les couleurs de base sont modifiables depuis Admin → Apparence
- * (injectées par le layout racine). Les teintes dérivées sont calculées ici.
+ * THE BODY CLUB — charte inspirée du site du club (Porto-Vecchio)
+ * Crème, noir d'encre et vert sauge ; titres condensés en capitales,
+ * mots d'accent en italique à empattement, étiquettes en chasse fixe.
+ * Couleurs et polices modifiables dans Admin → Site internet (injectées par le layout racine).
  */
 :root {
-  --ivory: #faf7f2;
-  --sand: #f1ebe3;
-  --taupe: #9c7f70;
-  --ink: #2a2421;
-  --muted: #7b716b;
-  --line: #e4dcd2;
+  --ivory: #f0eadb;
+  --sand: #faf6eb;
+  --taupe: #4b5c4a;
+  --ink: #131512;
+  --muted: #4f544d;
+  --line: #d8d0bd;
+  --feature: #29362a;
   --taupe-deep: color-mix(in srgb, var(--taupe) 72%, black);
-  --blush: color-mix(in srgb, var(--taupe) 28%, var(--ivory));
+  --blush: color-mix(in srgb, var(--taupe) 22%, var(--ivory));
   --linen: color-mix(in srgb, var(--sand) 70%, var(--taupe));
+  --sage: color-mix(in srgb, var(--taupe) 55%, var(--ivory));
   --danger: #a5483a;
-  --success: #5f7a5a;
+  --success: #4b5c4a;
   --btn-radius: 9999px;
-  --heading-font: var(--font-cormorant);
-  --body-font: var(--font-jost);
+  --heading-font: var(--font-bigshoulders);
+  --body-font: var(--font-geist);
+  --heading-transform: uppercase;
+  --heading-weight: 700;
+  --heading-tracking: -0.015em;
+  --heading-leading: 0.88;
 }
 
 @theme inline {
@@ -27,35 +34,78 @@
   --color-sand: var(--sand);
   --color-linen: var(--linen);
   --color-blush: var(--blush);
+  --color-sage: var(--sage);
   --color-taupe: var(--taupe);
   --color-taupe-deep: var(--taupe-deep);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
+  --color-feature: var(--feature);
   --color-danger: var(--danger);
   --color-success: var(--success);
-  --font-serif: var(--heading-font), Georgia, serif;
-  --font-sans: var(--body-font), system-ui, sans-serif;
+  --font-serif: var(--heading-font), Impact, sans-serif;
+  --font-sans: var(--body-font), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-accent: var(--font-instrument), "Times New Roman", serif;
 }
 
 body {
   background: var(--ivory);
   color: var(--ink);
-  font-family: var(--body-font), system-ui, sans-serif;
+  font-family: var(--body-font), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  letter-spacing: -0.005em;
   -webkit-tap-highlight-color: transparent;
 }
 
 h1, h2, h3 {
-  font-family: var(--heading-font), Georgia, serif;
+  font-family: var(--heading-font), Impact, sans-serif;
+  font-weight: var(--heading-weight);
+  text-transform: var(--heading-transform);
+  letter-spacing: var(--heading-tracking);
+  line-height: var(--heading-leading);
+}
+
+/* Mot d'accent en italique (« club », « un cours. ») : jamais en capitales */
+.accent {
+  font-family: var(--font-instrument), "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+/* L'administration garde des titres sobres et lisibles */
+.admin h1, .admin h2, .admin h3 {
+  font-family: var(--body-font), "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-weight: 500;
-  letter-spacing: 0.01em;
+  text-transform: none;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
 .btn {
   border-radius: var(--btn-radius);
 }
 
+/* Bandeau défilant */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track {
+  animation: marquee 40s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+}
+
 @media print {
   .no-print { display: none !important; }
   body { background: white; }
+}
+
+.admin .font-serif {
+  font-family: var(--body-font), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }

@@ -1,0 +1,14 @@
+<div style="background:#f0eadb;padding:40px 16px;font-family:Helvetica,Arial,sans-serif;color:#131512">
+  <div style="max-width:480px;margin:0 auto;background:#faf6eb;padding:40px 32px;border-radius:16px">
+    <p style="font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#4f544d;margin:0">The Body Club</p>
+    <h1 style="font-size:28px;text-transform:uppercase;margin:16px 0 24px">Nouveau mot de passe</h1>
+    <p style="line-height:1.6">Vous avez demandé à changer votre mot de passe. Cliquez sur le bouton ci-dessous pour en choisir un nouveau. Ce lien est valable une heure.</p>
+    <p style="margin:32px 0">
+      <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reinitialiser"
+         style="background:#131512;color:#f0eadb;padding:14px 28px;border-radius:999px;text-decoration:none;display:inline-block">
+        Choisir mon mot de passe
+      </a>
+    </p>
+    <p style="font-size:13px;color:#4f544d;line-height:1.6">Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email : votre mot de passe actuel reste valable.</p>
+  </div>
+</div>

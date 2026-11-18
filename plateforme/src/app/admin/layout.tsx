@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
-import { signOut } from "../connexion/actions";
+import { signOut } from "@/lib/account-actions";
 import { AdminNav } from "./admin-nav";
 
 export const metadata: Metadata = { title: { default: "Administration", template: "%s · Admin" } };
@@ -9,10 +9,10 @@ export const metadata: Metadata = { title: { default: "Administration", template
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const profile = await requireAdmin();
   return (
-    <div className="flex flex-1 flex-col lg:flex-row">
+    <div className="admin flex flex-1 flex-col lg:flex-row">
       <aside className="no-print border-b border-line bg-sand/60 px-4 py-4 lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r lg:px-5 lg:py-8">
         <div className="mb-4 flex items-center justify-between lg:mb-10 lg:block">
-          <Link href="/" className="font-serif text-2xl">The Body Club</Link>
+          <Link href="/" className="text-xl font-medium tracking-tight">The Body Club</Link>
           <p className="hidden text-xs uppercase tracking-[0.2em] text-muted lg:mt-1 lg:block">Administration</p>
         </div>
         <AdminNav />

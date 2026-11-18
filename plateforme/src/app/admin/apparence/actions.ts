@@ -11,9 +11,10 @@ const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide");
 const text = (max: number) => z.string().trim().max(max).default("");
 
 const schema = z.object({
-  color_background: hex, color_surface: hex, color_text: hex, color_muted: hex, color_accent: hex, color_line: hex,
-  heading_font: z.enum(["cormorant", "playfair", "bodoni"]),
-  body_font: z.enum(["jost", "inter", "montserrat"]),
+  color_background: hex, color_surface: hex, color_text: hex, color_muted: hex, color_accent: hex, color_line: hex, color_feature: hex,
+  heading_font: z.enum(["bigshoulders", "cormorant", "playfair", "bodoni"]),
+  body_font: z.enum(["geist", "jost", "inter", "montserrat"]),
+  hero_title_accent: text(30), marquee_text: text(200),
   button_shape: z.enum(["pill", "rounded", "square"]),
   hero_kicker: text(60), hero_title: z.string().trim().min(1, "Le titre est obligatoire").max(80),
   hero_subtitle: text(200), about_title: text(80), about_text: text(2000),

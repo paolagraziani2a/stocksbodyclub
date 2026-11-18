@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CoachCard, CoachPortrait, Kicker, Section } from "@/components/site";
-import { buttonStyles } from "@/components/ui";
+import { CoachCard, CoachPortrait, Label, Pill, Section } from "@/components/site";
 import { formatShortDay, formatTime } from "@/lib/dates";
 import { getCoach, getCoaches, getSessions } from "@/lib/site";
 
@@ -36,23 +35,23 @@ export default async function CoachPage({ params }: PageProps<"/coachs/[slug]">)
         </div>
 
         <div className="md:pt-10">
-          <Link href="/coachs" className="text-sm text-muted hover:text-ink">← Les coachs</Link>
-          <Kicker className="mt-10">{coach.headline || "Coach Lagree"}</Kicker>
-          <h1 className="mt-4 text-6xl sm:text-7xl">{coach.display_name}</h1>
+          <Link href="/coachs" className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted hover:text-ink">← Les coachs</Link>
+          <Label className="mt-10">{coach.headline || "Coach Lagree"}</Label>
+          <h1 className="mt-5 text-8xl sm:text-9xl">{coach.display_name}</h1>
 
           {coach.quote && (
-            <blockquote className="mt-10 border-l border-taupe pl-6 font-serif text-2xl italic leading-snug text-taupe-deep">
+            <blockquote className="accent mt-10 border-l border-taupe pl-6 text-3xl leading-snug text-taupe">
               « {coach.quote} »
             </blockquote>
           )}
 
-          {coach.bio && <p className="mt-10 whitespace-pre-line text-lg font-light leading-relaxed text-muted">{coach.bio}</p>}
+          {coach.bio && <p className="mt-10 whitespace-pre-line leading-relaxed text-muted">{coach.bio}</p>}
 
           {(coach.specialties.length > 0 || coach.certifications) && (
             <dl className="mt-12 grid gap-8 border-t border-line pt-8 sm:grid-cols-2">
               {coach.specialties.length > 0 && (
                 <div>
-                  <dt className="text-xs uppercase tracking-[0.2em] text-muted">Spécialités</dt>
+                  <dt className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Spécialités</dt>
                   <dd className="mt-3 flex flex-wrap gap-2">
                     {coach.specialties.map((s) => <span key={s} className="rounded-full border border-line px-3 py-1 text-sm">{s}</span>)}
                   </dd>
@@ -60,7 +59,7 @@ export default async function CoachPage({ params }: PageProps<"/coachs/[slug]">)
               )}
               {coach.certifications && (
                 <div>
-                  <dt className="text-xs uppercase tracking-[0.2em] text-muted">Formation</dt>
+                  <dt className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Formation</dt>
                   <dd className="mt-3 whitespace-pre-line text-sm leading-relaxed">{coach.certifications}</dd>
                 </div>
               )}
@@ -74,11 +73,11 @@ export default async function CoachPage({ params }: PageProps<"/coachs/[slug]">)
           )}
 
           <div className="mt-14">
-            <h2 className="text-3xl">Ses prochains cours</h2>
+            <h2 className="text-5xl">Ses prochains <span className="accent text-taupe">cours.</span></h2>
             {upcoming.length === 0 ? (
               <p className="mt-4 text-sm text-muted">Aucun cours programmé ces deux prochaines semaines.</p>
             ) : (
-              <ul className="mt-6 divide-y divide-line border-y border-line">
+              <ul className="mt-6 divide-y divide-line border-y border-ink">
                 {upcoming.map((s) => {
                   const left = s.capacity - s.booked_count;
                   return (
@@ -93,7 +92,7 @@ export default async function CoachPage({ params }: PageProps<"/coachs/[slug]">)
                 })}
               </ul>
             )}
-            <Link href="/planning" className={`${buttonStyles.primary} mt-8 px-8 py-3`}>Réserver un cours</Link>
+            <Pill href="/planning" className="mt-8">Réserver un cours</Pill>
           </div>
         </div>
       </Section>
@@ -101,7 +100,7 @@ export default async function CoachPage({ params }: PageProps<"/coachs/[slug]">)
       {others.length > 0 && (
         <section className="bg-sand/60">
           <Section>
-            <h2 className="text-4xl">Les autres coachs</h2>
+            <h2 className="text-6xl">Les autres <span className="accent text-taupe">coachs.</span></h2>
             <div className="mt-10 grid gap-10 sm:grid-cols-2 lg:grid-cols-3">{others.map((c) => <CoachCard key={c.id} coach={c} />)}</div>
           </Section>
         </section>

@@ -27,7 +27,7 @@ export default async function InvoicePage({ params }: PageProps<"/factures/[id]"
   const isCredit = inv.kind === "credit_note";
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-10 print:max-w-none print:p-0">
+    <main className="admin mx-auto w-full max-w-3xl px-6 py-10 print:max-w-none print:p-0">
       <div className="no-print mb-6 flex justify-end"><PrintButton /></div>
       <article className="rounded-2xl border border-line bg-white p-8 sm:p-12 print:border-0 print:p-0">
         <header className="flex flex-col justify-between gap-8 sm:flex-row">

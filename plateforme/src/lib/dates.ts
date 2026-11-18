@@ -69,3 +69,8 @@ export function labelOfDay(day: string, opts: Intl.DateTimeFormatOptions = { wee
 export function isUpcoming(iso: string): boolean {
   return new Date(iso).getTime() > Date.now();
 }
+
+/** Heures restantes avant un instant (négatif s'il est passé). */
+export function hoursUntil(iso: string): number {
+  return (new Date(iso).getTime() - Date.now()) / 3600_000;
+}

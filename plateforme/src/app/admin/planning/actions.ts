@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAdmin, type ActionResult } from "@/lib/auth";
 import { errorMessage } from "@/lib/errors";
+import { notifySessionCancelled } from "@/lib/notify";
 import { createClient } from "@/lib/supabase/server";
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide");
@@ -83,8 +84,14 @@ export async function cancelSession(_p: ActionResult, form: FormData): Promise<A
   const { data, error } = await supabase.rpc("admin_cancel_session", { p_session_id: id, p_reason: reason });
   if (error) return { ok: false, message: errorMessage(error) };
   revalidatePath("/admin/planning");
-  const n = (data as { refunded_bookings: number }).refunded_bookings;
-  return { ok: true, message: `Cours annulé. ${n} cliente(s) recréditée(s).` };
+  const r = data as { refunded_bookings: number; user_ids: string[] };
+  const sms = await notifySessionCancelled(id, r.user_ids);
+  // Le bloc d'annulation disparaît une fois le cours annulé : le bilan s'affiche en haut de la page
+  const q = new URLSearchParams({
+    annule: String(r.refunded_bookings), sms: String(sms.sent), simu: String(sms.simulated),
+    ko: String(sms.failed + sms.skipped),
+  });
+  redirect(`/admin/planning/${id}?${q}`);
 }
 
 export async function deleteSession(_p: ActionResult, form: FormData): Promise<ActionResult> {

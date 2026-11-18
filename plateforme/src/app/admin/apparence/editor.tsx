@@ -13,17 +13,19 @@ const COLORS: { key: keyof Appearance; label: string }[] = [
   { key: "color_muted", label: "Texte discret" },
   { key: "color_accent", label: "Accent" },
   { key: "color_line", label: "Bordures" },
+  { key: "color_feature", label: "Section foncée" },
 ];
 
 const PRESETS: { name: string; colors: Partial<Appearance> }[] = [
+  { name: "Porto-Vecchio (club)", colors: { color_background: "#f0eadb", color_surface: "#faf6eb", color_text: "#131512", color_muted: "#4f544d", color_accent: "#4b5c4a", color_line: "#d8d0bd", color_feature: "#29362a" } },
   { name: "Sable (par défaut)", colors: { color_background: "#faf7f2", color_surface: "#f1ebe3", color_text: "#2a2421", color_muted: "#7b716b", color_accent: "#9c7f70", color_line: "#e4dcd2" } },
   { name: "Rose poudré", colors: { color_background: "#fbf6f4", color_surface: "#f4e7e3", color_text: "#2e2426", color_muted: "#80706f", color_accent: "#b98a86", color_line: "#ecdcd8" } },
   { name: "Sauge", colors: { color_background: "#f7f7f2", color_surface: "#e9ece2", color_text: "#232823", color_muted: "#6f766c", color_accent: "#7d8b74", color_line: "#dde1d5" } },
   { name: "Noir & or", colors: { color_background: "#fbfaf8", color_surface: "#efece6", color_text: "#151413", color_muted: "#6e6a64", color_accent: "#a8875a", color_line: "#e2ddd4" } },
 ];
 
-const HEADING_CSS = { cormorant: "var(--font-cormorant)", playfair: "var(--font-playfair)", bodoni: "var(--font-bodoni)" };
-const BODY_CSS = { jost: "var(--font-jost)", inter: "var(--font-inter)", montserrat: "var(--font-montserrat)" };
+const HEADING_CSS = { bigshoulders: "var(--font-bigshoulders)", cormorant: "var(--font-cormorant)", playfair: "var(--font-playfair)", bodoni: "var(--font-bodoni)" };
+const BODY_CSS = { geist: "var(--font-geist)", jost: "var(--font-jost)", inter: "var(--font-inter)", montserrat: "var(--font-montserrat)" };
 const RADIUS = { pill: "9999px", rounded: "0.75rem", square: "0" };
 
 export function AppearanceEditor({ initial }: { initial: Appearance }) {
@@ -67,6 +69,7 @@ export function AppearanceEditor({ initial }: { initial: Appearance }) {
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <Field label="Titres">
               <Select name="heading_font" value={a.heading_font} onChange={(e) => set("heading_font", e.target.value as Appearance["heading_font"])}>
+                <option value="bigshoulders">Big Shoulders (condensée, capitales)</option>
                 <option value="cormorant">Cormorant Garamond</option>
                 <option value="playfair">Playfair Display</option>
                 <option value="bodoni">Bodoni Moda</option>
@@ -74,6 +77,7 @@ export function AppearanceEditor({ initial }: { initial: Appearance }) {
             </Field>
             <Field label="Texte">
               <Select name="body_font" value={a.body_font} onChange={(e) => set("body_font", e.target.value as Appearance["body_font"])}>
+                <option value="geist">Geist</option>
                 <option value="jost">Jost</option>
                 <option value="inter">Inter</option>
                 <option value="montserrat">Montserrat</option>
@@ -94,6 +98,8 @@ export function AppearanceEditor({ initial }: { initial: Appearance }) {
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <Field label="Sur-titre"><Input name="hero_kicker" value={a.hero_kicker} onChange={(e) => set("hero_kicker", e.target.value)} maxLength={60} /></Field>
             <Field label="Titre"><Input name="hero_title" value={a.hero_title} onChange={(e) => set("hero_title", e.target.value)} required maxLength={80} /></Field>
+            <Field label="Mot en italique" hint="Affiché sous le titre : « club »"><Input name="hero_title_accent" value={a.hero_title_accent} onChange={(e) => set("hero_title_accent", e.target.value)} maxLength={30} /></Field>
+            <Field label="Bandeau défilant" hint="Mots séparés par /"><Input name="marquee_text" defaultValue={a.marquee_text} maxLength={200} /></Field>
             <Field label="Phrase d'accroche" className="sm:col-span-2">
               <Input name="hero_subtitle" value={a.hero_subtitle} onChange={(e) => set("hero_subtitle", e.target.value)} maxLength={200} />
             </Field>
@@ -135,7 +141,8 @@ export function AppearanceEditor({ initial }: { initial: Appearance }) {
           style={{ background: a.color_background, color: a.color_text, borderColor: a.color_line, fontFamily: BODY_CSS[a.body_font] }}
         >
           <p className="text-[10px] uppercase tracking-[0.35em]" style={{ color: a.color_muted }}>{a.hero_kicker}</p>
-          <p className="mt-4 text-4xl" style={{ fontFamily: HEADING_CSS[a.heading_font] }}>{a.hero_title}</p>
+          <p className="mt-4 text-5xl" style={{ fontFamily: HEADING_CSS[a.heading_font], textTransform: a.heading_font === "bigshoulders" ? "uppercase" : "none", fontWeight: a.heading_font === "bigshoulders" ? 700 : 500, lineHeight: 0.9 }}>{a.hero_title}</p>
+          {a.hero_title_accent && <p className="text-4xl italic" style={{ fontFamily: "var(--font-instrument)", color: a.color_accent }}>{a.hero_title_accent}</p>}
           <p className="mx-auto mt-4 max-w-xs text-sm font-light" style={{ color: a.color_muted }}>{a.hero_subtitle}</p>
           <div className="mt-8 flex justify-center gap-2 text-xs">
             <span className="px-5 py-2.5" style={{ background: a.color_text, color: a.color_background, borderRadius: RADIUS[a.button_shape] }}>Voir le planning</span>

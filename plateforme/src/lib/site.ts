@@ -14,7 +14,7 @@ export type Coach = {
 export type Photo = { id: string; url: string; alt: string };
 export type Product = {
   id: string; name: string; description: string | null; credits: number; price_cents: number;
-  validity_value: number; validity_unit: "day" | "month"; is_unlimited: boolean;
+  validity_value: number; validity_unit: "day" | "month"; is_unlimited: boolean; max_per_client: number | null;
 };
 export type PublicSession = {
   id: string; title: string; starts_at: string; ends_at: string; capacity: number; booked_count: number;
@@ -42,7 +42,7 @@ export async function getPhotos(): Promise<Photo[]> {
 
 export async function getProducts(): Promise<Product[]> {
   const { data } = await anon().from("products")
-    .select("id, name, description, credits, price_cents, validity_value, validity_unit, is_unlimited")
+    .select("id, name, description, credits, price_cents, validity_value, validity_unit, is_unlimited, max_per_client")
     .eq("active", true).order("sort_order");
   return (data ?? []) as Product[];
 }
@@ -57,13 +57,4 @@ export async function getSessions(fromIso: string, toIso: string, teacherId?: st
   return data ?? [];
 }
 
-export function validityLabel(p: Pick<Product, "validity_value" | "validity_unit">) {
-  return p.validity_unit === "month"
-    ? `${p.validity_value} mois`
-    : `${p.validity_value} jour${p.validity_value > 1 ? "s" : ""}`;
-}
-
-/** Lien d'itinéraire sans clé d'API (ouvre Google Maps, ou Plans sur iPhone). */
-export function mapsLink(address: string) {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-}
+export { mapsLink, validityLabel } from "./format";

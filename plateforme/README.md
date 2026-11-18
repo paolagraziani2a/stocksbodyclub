@@ -93,9 +93,15 @@ npm run dev
 ```bash
 npx supabase start          # Docker requis
 npx supabase db reset       # applique migrations + seed
-npm run demo                # admin pao@bodyclub.test / bodyclub-demo
+npm run demo                # admin pao@bodyclub.test / bodyclub2026
 npm run dev                 # http://localhost:3000/admin
 ```
+
+### SMS (Brevo)
+
+Ajouter `BREVO_API_KEY` (et éventuellement `SMS_SENDER`, 11 caractères max, par défaut « BodyClub »)
+dans les variables d'environnement du serveur. Sans clé, aucun SMS n'est envoyé : chaque message est
+journalisé avec le statut « simulé » (visible sur la page du cours dans l'admin).
 
 ### Tests
 
@@ -125,6 +131,14 @@ La CI GitHub Actions (`.github/workflows/plateforme.yml`) exécute tout cela à 
 - [x] Site client : accueil (photos du studio, méthode, coachs, tarifs, infos pratiques, itinéraire),
       pages « Les coachs » et profil de chaque coach (photo, présentation, spécialités, prochains cours),
       tarifs, planning public avec places restantes ; profils et galerie modifiables depuis l'admin
-- [ ] Lot 4 — administration : fiches clientes, produits
+- [x] Identité visuelle du club (thebodyclub-portovecchio.com) : Big Shoulders, Instrument Serif, Geist, crème / encre / sauge
+- [x] Comptes clientes : inscription (email + mot de passe + mobile), connexion, mot de passe oublié par email,
+      espace « Mon compte » (solde, cours, cartes, factures, profil), réservation et liste d'attente depuis le planning
+- [x] Admin → Clientes : fiche, vente au studio (CB, espèces, virement) ou carte offerte, correction de crédits,
+      lien de réinitialisation et mot de passe temporaire (les mots de passe ne sont jamais lisibles)
+- [x] SMS d'annulation de cours (Brevo) ; sans clé BREVO_API_KEY, envois simulés et journalisés
+- [x] Séance d'essai 15 € (une par cliente) ; CGV et politique de confidentialité (projets à faire valider)
+- [ ] Lot 3 — paiement en ligne Stripe
+- [ ] Lot 4 — administration : produits
 - [ ] Lot 6 — liste d'attente (emails), confirmations, PWA, tâches planifiées
 - [ ] Lot 7 — import bsport, sauvegardes, mise en production

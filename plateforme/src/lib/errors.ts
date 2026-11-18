@@ -23,6 +23,8 @@ const MESSAGES: Record<string, string> = {
   INVALID_CREDITS: "Nombre de crédits invalide.",
   REFUND_EXCEEDS_PAYMENT: "Le remboursement dépasse le montant payé.",
   ORDER_NOT_REFUNDABLE: "Cette commande ne peut pas être remboursée.",
+  PRODUCT_LIMIT_REACHED: "Vous avez déjà profité de cette offre.",
+  LATE_CANCEL_LIMIT: "Vous avez atteint la limite d'annulations tardives consécutives : cette réservation ne peut plus être annulée. Contactez le studio.",
   CANNOT_DEMOTE_SELF: "Vous ne pouvez pas retirer votre propre accès administrateur.",
 };
 

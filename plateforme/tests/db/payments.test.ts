@@ -5,7 +5,7 @@ import { asService, asUser, book, createSession, createUser, errorOf, ledger, po
 afterAll(() => pool.end());
 
 async function productId(credits: number): Promise<string> {
-  const { rows } = await pool.query("select id from public.products where credits = $1", [credits]);
+  const { rows } = await pool.query("select id from public.products where credits = $1 and max_per_client is null", [credits]);
   return rows[0].id;
 }
 

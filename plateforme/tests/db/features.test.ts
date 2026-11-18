@@ -369,3 +369,63 @@ describe("Profils des coachs et pages publiques", () => {
       .toMatch(/check constraint/);
   });
 });
+
+describe("Comptes, séance d'essai et notifications", () => {
+  it("séance d'essai : une seule par cliente", async () => {
+    const u = await createUser();
+    await buy(u, "Séance d'essai");
+    expect(await errorOf(asUser(u, async (c) =>
+      c.query("select public.create_pending_order($1)", [await productId("Séance d'essai")])))).toBe("PRODUCT_LIMIT_REACHED");
+    // les autres cartes restent achetables à volonté
+    await buy(u, "Carte 1 cours");
+    await buy(u, "Carte 1 cours");
+  });
+
+  it("le téléphone et le choix SMS donnés à l'inscription sont enregistrés", async () => {
+    const { randomUUID: uuid } = await import("node:crypto");
+    const id = uuid();
+    await pool.query("insert into auth.users (id, email, raw_user_meta_data) values ($1, $2, $3)",
+      [id, `${id}@t.local`, { first_name: "Nina", phone: "+33612345678", sms_opt_in: false }]);
+    const { rows: [p] } = await pool.query("select phone, sms_opt_in, must_change_password from public.profiles where id = $1", [id]);
+    expect(p).toEqual({ phone: "+33612345678", sms_opt_in: false, must_change_password: false });
+  });
+
+  it("la cliente lève elle-même l'obligation de changer son mot de passe, sans pouvoir modifier ce champ directement", async () => {
+    const u = await createUser();
+    await pool.query("update public.profiles set must_change_password = true where id = $1", [u]);
+    expect(await errorOf(asUser(u, (c) => c.query("update public.profiles set must_change_password = false where id = $1", [u]))))
+      .toMatch(/permission denied/);
+    await asUser(u, (c) => c.query("select public.clear_must_change_password()"));
+    const { rows: [p] } = await pool.query("select must_change_password from public.profiles where id = $1", [u]);
+    expect(p.must_change_password).toBe(false);
+  });
+
+  it("le journal des SMS n'est lisible que par l'admin", async () => {
+    const u = await createUser();
+    await pool.query("insert into public.notification_log (user_id, channel, kind, recipient, body, status) values ($1, 'sms', 'session_cancelled', '+33600000000', 'x', 'simulated')", [u]);
+    expect((await asUser(u, (c) => c.query("select * from public.notification_log"))).rows).toEqual([]);
+    expect((await asUser(await getAdmin(), (c) => c.query("select * from public.notification_log"))).rows.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Vente au studio", () => {
+  it("crée commande payée, carte et facture « au studio », et compte dans le CA", async () => {
+    const admin = await getAdmin();
+    const u = await createUser();
+    const before = await asUser(admin, async (c) => (await c.query("select public.admin_dashboard() as d")).rows[0].d);
+    const r = await asUser(admin, async (c) => (await c.query(
+      "select public.admin_sell_product($1, $2, 'cash') as r", [u, await productId("Carte 5 cours")])).rows[0].r);
+    const p = await pass(r.pass_id);
+    expect(p).toMatchObject({ credits_remaining: 5, activated_at: null });
+    const { rows: [inv] } = await pool.query("select payment_method, total_ttc_cents from public.invoices where order_id = $1", [r.order_id]);
+    expect(inv).toEqual({ payment_method: "Espèces", total_ttc_cents: 15000 });
+    const after = await asUser(admin, async (c) => (await c.query("select public.admin_dashboard() as d")).rows[0].d);
+    expect(after.today.gross_cents - before.today.gross_cents).toBe(15000);
+  });
+
+  it("réservée à l'admin", async () => {
+    const u = await createUser();
+    expect(await errorOf(asUser(u, async (c) => c.query("select public.admin_sell_product($1, $2)", [u, await productId("Carte 1 cours")]))))
+      .toBe("FORBIDDEN");
+  });
+});

@@ -30,7 +30,7 @@ describe("Sécurité (RLS et droits)", () => {
     await createSession();
     await asUser(null, async (c) => {
       expect((await c.query("select count(*)::int as n from public.class_sessions")).rows[0].n).toBeGreaterThan(0);
-      expect((await c.query("select count(*)::int as n from public.products")).rows[0].n).toBe(5);
+      expect((await c.query("select count(*)::int as n from public.products")).rows[0].n).toBe(6);
     });
     expect(await errorOf(asUser(null, (c) => c.query("select * from public.bookings")))).toMatch(/permission denied/);
     expect(await errorOf(asUser(null, (c) => c.query("select public.book_session(gen_random_uuid())")))).toMatch(/permission denied/);
@@ -116,7 +116,7 @@ describe("Sécurité (RLS et droits)", () => {
 
   it("la modification d'un produit est tracée dans le journal d'audit", async () => {
     const admin = await getAdmin();
-    const { rows: [prod] } = await pool.query("select id from public.products where credits = 1");
+    const { rows: [prod] } = await pool.query("select id from public.products where credits = 1 and max_per_client is null");
     await asUser(admin, (c) => c.query("update public.products set description = 'Essai' where id = $1", [prod.id]));
     const { rows } = await pool.query(
       "select actor_id, action from public.audit_log where entity = 'products' and entity_id = $1 order by id desc limit 1",

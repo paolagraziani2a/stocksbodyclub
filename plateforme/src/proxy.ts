@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED = ["/compte", "/admin", "/prof"];
+const PROTECTED = ["/compte", "/admin", "/prof", "/reinitialiser"];
 
 /**
  * Rafraîchit la session Supabase à chaque requête et redirige vers la connexion

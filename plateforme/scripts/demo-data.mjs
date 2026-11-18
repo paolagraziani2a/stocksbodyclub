@@ -14,10 +14,12 @@ const supabase = createClient(API, SERVICE_KEY, { auth: { persistSession: false 
 const db = new pg.Client({ connectionString: DB });
 await db.connect();
 
+let phoneSeq = 10;
 async function user(email, first, last, role = "client") {
   const { data, error } = await supabase.auth.admin.createUser({
-    email, password: "bodyclub-demo", email_confirm: true,
-    user_metadata: { first_name: first, last_name: last, terms_accepted: "true" },
+    email, password: "bodyclub2026", email_confirm: true,
+    // numéros fictifs (plage réservée aux fictions par l'ARCEP : 06 39 98 xx xx)
+    user_metadata: { first_name: first, last_name: last, terms_accepted: "true", phone: `+336399800${phoneSeq++}` },
   });
   if (error) throw error;
   if (role !== "client") await db.query("update public.profiles set role = $2 where id = $1", [data.user.id, role]);
@@ -143,7 +145,7 @@ for (const [i, f] of readdirSync(dir).sort().entries()) {
 }
 
 console.log("Données de démonstration créées.");
-console.log("Admin : pao@bodyclub.test / bodyclub-demo");
-console.log("Professeure : camille@bodyclub.test / bodyclub-demo");
-console.log("Cliente : ines@client.test / bodyclub-demo");
+console.log("Admin : pao@bodyclub.test / bodyclub2026");
+console.log("Professeure : camille@bodyclub.test / bodyclub2026");
+console.log("Cliente : ines@client.test / bodyclub2026");
 await db.end();

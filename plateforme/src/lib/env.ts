@@ -14,12 +14,12 @@ function required(name: string): string {
   return v;
 }
 
-/** Secrets serveur — lus à la demande, jamais exposés au navigateur. */
+/** Secrets serveur — chacun lu seulement quand il sert, jamais exposé au navigateur. */
 export function serverEnv() {
   return {
-    supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
-    stripeSecretKey: required("STRIPE_SECRET_KEY"),
-    stripeWebhookSecret: required("STRIPE_WEBHOOK_SECRET"),
-    cronSecret: required("CRON_SECRET"),
+    get supabaseServiceRoleKey() { return required("SUPABASE_SERVICE_ROLE_KEY"); },
+    get stripeSecretKey() { return required("STRIPE_SECRET_KEY"); },
+    get stripeWebhookSecret() { return required("STRIPE_WEBHOOK_SECRET"); },
+    get cronSecret() { return required("CRON_SECRET"); },
   };
 }
