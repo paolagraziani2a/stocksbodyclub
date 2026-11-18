@@ -429,3 +429,25 @@ describe("Vente au studio", () => {
       .toBe("FORBIDDEN");
   });
 });
+
+describe("Catalogue du studio", () => {
+  it("durées de validité validées par le studio", async () => {
+    const { rows } = await pool.query(
+      "select name, validity_value || ' ' || validity_unit as v from public.products where name in ('Carte 3 cours','Carte 5 cours','Carte 10 cours','Illimité') order by name");
+    expect(Object.fromEntries(rows.map((r) => [r.name, r.v]))).toEqual({
+      "Carte 3 cours": "1 month", "Carte 5 cours": "1 month", "Carte 10 cours": "2 month", "Illimité": "1 month",
+    });
+  });
+
+  it("changer la durée d'une carte ne touche pas les cartes déjà achetées", async () => {
+    const admin = await getAdmin();
+    const u = await createUser();
+    const { pass_id } = await buy(u, "Carte 5 cours");
+    const id = await productId("Carte 5 cours");
+    await asUser(admin, (c) => c.query("update public.products set validity_value = 3 where id = $1", [id]));
+    expect((await pass(pass_id)).validity_value).toBe(1);
+    const second = await buy(u, "Carte 5 cours");
+    expect((await pass(second.pass_id)).validity_value).toBe(3);
+    await asUser(admin, (c) => c.query("update public.products set validity_value = 1 where id = $1", [id]));
+  });
+});

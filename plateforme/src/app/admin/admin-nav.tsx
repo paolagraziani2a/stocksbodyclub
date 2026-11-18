@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/admin", label: "Tableau de bord" },
   { href: "/admin/planning", label: "Planning" },
   { href: "/admin/clientes", label: "Clientes" },
+  { href: "/admin/produits", label: "Cartes & tarifs" },
   { href: "/admin/paiements", label: "Paiements & factures" },
   { href: "/admin/professeurs", label: "Professeurs" },
   { href: "/admin/apparence", label: "Site internet" },

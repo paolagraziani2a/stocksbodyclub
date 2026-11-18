@@ -139,6 +139,6 @@ La CI GitHub Actions (`.github/workflows/plateforme.yml`) exécute tout cela à 
 - [x] SMS d'annulation de cours (Brevo) ; sans clé BREVO_API_KEY, envois simulés et journalisés
 - [x] Séance d'essai 15 € (une par cliente) ; CGV et politique de confidentialité (projets à faire valider)
 - [ ] Lot 3 — paiement en ligne Stripe
-- [ ] Lot 4 — administration : produits
+- [x] Admin → Cartes & tarifs : prix, nombre de cours et durée de validité modifiables (prochains achats uniquement)
 - [ ] Lot 6 — liste d'attente (emails), confirmations, PWA, tâches planifiées
 - [ ] Lot 7 — import bsport, sauvegardes, mise en production
