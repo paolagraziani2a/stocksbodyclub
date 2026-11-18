@@ -2,10 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireAdmin, type ActionResult } from "@/lib/auth";
-import { errorMessage } from "@/lib/errors";
+import { adminRun, requireAdmin, type ActionResult } from "@/lib/auth";
 import { hasFile, uploadImage } from "@/lib/storage";
-import { createClient } from "@/lib/supabase/server";
 
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide");
 const text = (max: number) => z.string().trim().max(max).default("");
@@ -30,20 +28,19 @@ export async function saveAppearance(_p: ActionResult, form: FormData): Promise<
   const parsed = schema.safeParse(Object.fromEntries(form.entries()));
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
 
-  const supabase = await createClient();
   const update: Record<string, unknown> = { ...parsed.data };
   try {
     for (const [field, prefix] of [["logo", "logo"], ["hero_image", "accueil"]] as const) {
       const file = form.get(field);
       if (form.get(`${field}_remove`) === "on") update[`${field}_url`] = null;
-      else if (hasFile(file)) update[`${field}_url`] = await uploadImage(supabase, file, prefix);
+      else if (hasFile(file)) update[`${field}_url`] = await uploadImage(file, prefix);
     }
   } catch (e) {
     return { ok: false, message: (e as Error).message };
   }
 
-  const { error } = await supabase.from("site_appearance").update(update).eq("id", true);
-  if (error) return { ok: false, message: errorMessage(error) };
+  const r = await adminRun((tx) => tx.update("public.site_appearance", update, true));
+  if (!r.ok) return { ok: false, message: r.message };
   revalidatePath("/", "layout");
   return { ok: true, message: "Le site a été mis à jour." };
 }

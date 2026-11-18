@@ -10,7 +10,8 @@ import { cancelMyBooking, leaveWaitlist, signOut, updateProfile } from "@/lib/ac
 import { formatDate, formatShortDay, formatTime, hoursUntil, isUpcoming } from "@/lib/dates";
 import { formatEuros } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
-import { createClient } from "@/lib/supabase/server";
+import { getSessionUser, type Profile } from "@/lib/auth";
+import { asUser } from "@/lib/db";
 
 export const metadata: Metadata = { title: "Mon compte", robots: { index: false } };
 
@@ -29,25 +30,30 @@ const PAST_STATUS: Record<string, string> = {
 
 export default async function AccountPage({ searchParams }: PageProps<"/compte">) {
   const sp = await searchParams;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) redirect("/connexion?suite=/compte");
 
-  const [{ data: profile }, { data: balance }, { data: bookings }, { data: waitlist }, { data: passes }, { data: invoices }, { data: settings }] =
-    await Promise.all([
-      supabase.from("profiles").select("*").eq("id", user.id).single(),
-      supabase.rpc("my_credit_balance").single<{ usable_credits: number; next_expiry: string | null; unlimited_until: string | null }>(),
-      supabase.from("bookings")
-        .select("id, status, credits_used, class_sessions(id, title, starts_at, status, teachers(display_name))")
-        .eq("user_id", user.id).order("created_at", { ascending: false }).limit(60).returns<BookingRow[]>(),
-      supabase.from("waitlist_entries").select("id, session_id, class_sessions(title, starts_at)")
-        .eq("user_id", user.id).eq("status", "waiting")
-        .returns<{ id: string; session_id: string; class_sessions: { title: string; starts_at: string } }[]>(),
-      supabase.from("passes").select("id, name, is_unlimited, credits_total, credits_remaining, activated_at, expires_at, revoked_at")
-        .eq("user_id", user.id).order("created_at", { ascending: false }).returns<PassRow[]>(),
-      supabase.from("invoices").select("id, number, kind, issued_at, total_ttc_cents").eq("user_id", user.id).order("issued_at", { ascending: false }),
-      supabase.from("studio_settings").select("cancel_window_hours").single(),
-    ]);
+  const { profile, balance, bookings, waitlist, passes, invoices, settings } = await asUser(user.id, async (tx) => ({
+    profile: await tx.one<Profile>("select * from public.profiles where id = auth.uid()"),
+    balance: await tx.one<{ usable_credits: number; next_expiry: string | null; unlimited_until: string | null }>(
+      "select * from public.my_credit_balance()"),
+    bookings: await tx.many<BookingRow>(
+      `select b.id, b.status, b.credits_used,
+              json_build_object('id', s.id, 'title', s.title, 'starts_at', s.starts_at, 'status', s.status,
+                'teachers', case when t.id is null then null else json_build_object('display_name', t.display_name) end) as class_sessions
+       from public.bookings b join public.class_sessions s on s.id = b.session_id left join public.teachers t on t.id = s.teacher_id
+       where b.user_id = auth.uid() order by b.created_at desc limit 60`),
+    waitlist: await tx.many<{ id: string; session_id: string; class_sessions: { title: string; starts_at: string } }>(
+      `select w.id, w.session_id, json_build_object('title', s.title, 'starts_at', s.starts_at) as class_sessions
+       from public.waitlist_entries w join public.class_sessions s on s.id = w.session_id
+       where w.user_id = auth.uid() and w.status = 'waiting'`),
+    passes: await tx.many<PassRow>(
+      `select id, name, is_unlimited, credits_total, credits_remaining, activated_at, expires_at, revoked_at
+       from public.passes where user_id = auth.uid() order by created_at desc`),
+    invoices: await tx.many<{ id: string; number: string; kind: string; issued_at: string; total_ttc_cents: number }>(
+      "select id, number, kind, issued_at, total_ttc_cents from public.invoices where user_id = auth.uid() order by issued_at desc"),
+    settings: await tx.one<{ cancel_window_hours: number }>("select cancel_window_hours from public.studio_settings"),
+  }));
   if (profile?.must_change_password) redirect("/reinitialiser?temporaire=1");
   if (profile?.role === "admin") redirect("/admin");
 

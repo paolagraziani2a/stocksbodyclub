@@ -42,3 +42,4 @@ next-env.d.ts
 
 # le modèle de configuration est versionné
 !.env.example
+public/uploads/

@@ -3,7 +3,7 @@ import path from "node:path";
 import { Client } from "pg";
 
 /**
- * Crée une base de test neuve et y applique : shim Supabase → migrations → seed.
+ * Crée une base de test neuve et y applique : migrations → données de départ.
  * Base par défaut : postgres://postgres:postgres@localhost:5432 (surcharge : TEST_DATABASE_ADMIN_URL).
  */
 export const TEST_DB = "bodyclub_test";
@@ -23,12 +23,12 @@ export default async function setup() {
   const db = new Client({ connectionString: url.toString() });
   await db.connect();
   await db.query("set client_min_messages = error");
-  const root = path.resolve(__dirname, "../../supabase");
+  const root = path.resolve(__dirname, "../../db");
   const migrations = readdirSync(path.join(root, "migrations"))
     .filter((f) => f.endsWith(".sql"))
     .sort()
     .map((f) => path.join(root, "migrations", f));
-  for (const file of [path.join(root, "tests/supabase_shim.sql"), ...migrations, path.join(root, "seed.sql")]) {
+  for (const file of [...migrations, path.join(root, "seed.sql")]) {
     try {
       await db.query(readFileSync(file, "utf8"));
     } catch (e) {

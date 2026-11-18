@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { adminTx, requireAdmin } from "@/lib/auth";
 import { DISCIPLINE_ORDER, DISCIPLINES, LEVELS, type Discipline, type Level } from "@/lib/format";
-import { createClient } from "@/lib/supabase/server";
 import { saveClassType } from "./actions";
 
 export const metadata: Metadata = { title: "Cours proposés" };
@@ -51,8 +50,7 @@ function Fields({ t }: { t?: ClassType }) {
 
 export default async function ClassTypesPage() {
   await requireAdmin();
-  const supabase = await createClient();
-  const { data } = await supabase.from("class_types").select("*").order("sort_order").order("name").returns<ClassType[]>();
+  const data = await adminTx((tx) => tx.many<ClassType>("select * from public.class_types order by sort_order, name"));
   const list = data ?? [];
 
   return (

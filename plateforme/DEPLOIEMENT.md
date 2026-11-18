@@ -1,91 +1,112 @@
-# Mise en ligne — THE BODY CLUB
+# Mise en ligne — THE BODY CLUB (Vercel + Neon)
 
-Trois services à relier : **Supabase** (base de données, comptes, photos), **Vercel** (le site),
-et plus tard **Stripe** (paiement) et **Brevo** (SMS). Compter environ 1 heure la première fois.
+| Service | Rôle |
+|---|---|
+| **Vercel** | le site et l'administration |
+| **Neon** | la base de données PostgreSQL (clientes, cours, réservations, crédits, factures, comptes) |
+| **Vercel Blob** | les photos (studio, coachs, logo) |
+| **Brevo** | emails (confirmation de compte, mot de passe oublié) et SMS (cours annulé) |
+| Stripe | paiement en ligne — étape suivante du projet |
 
 > Le code est dans le dépôt GitHub `paolagraziani2a/stocksbodyclub`, dossier **`plateforme/`**,
-> branche **`claude/body-club-booking-platform-ws6cs5`**. La branche par défaut du dépôt est celle
-> de l'outil de stock : il faut donc indiquer cette branche et ce dossier à Vercel (étape 2).
+> branche **`claude/body-club-booking-platform-ws6cs5`** (la branche par défaut du dépôt est celle de
+> l'outil de stock : il faut indiquer ce dossier et cette branche à Vercel).
 
 ---
 
-## 1. Supabase (base de données)
+## 1. Créer le projet sur Vercel
 
-1. Créer un compte sur supabase.com → **New project**
-   - Nom : `bodyclub` · Région : **West EU (Paris)** (données en France, RGPD)
-   - Noter le **mot de passe de la base** (dans un gestionnaire de mots de passe)
-2. Installer les tables, règles et cartes du studio (depuis un ordinateur avec Node.js) :
-   ```bash
-   cd plateforme
-   npx supabase login
-   npx supabase link --project-ref <identifiant du projet>   # Settings → General
-   npx supabase db push --include-seed                        # migrations + cartes + 8 cours
-   ```
-   Ne **pas** lancer `npm run demo` sur ce projet : ce sont des données fictives, réservées au local.
-3. **Authentication → URL Configuration**
-   - Site URL : `https://<votre domaine>` (ou l'adresse `…vercel.app` au début)
-   - Redirect URLs : `https://<votre domaine>/**`
-4. **Authentication → Providers → Email** : activer « Confirm email » ;
-   mot de passe : 8 caractères minimum, « lettres et chiffres ».
-5. **Authentication → Email Templates** : copier le contenu de
-   `supabase/templates/confirmation.html` (Confirm signup) et `supabase/templates/recovery.html`
-   (Reset password), avec leurs sujets (voir `supabase/config.toml`).
-6. **Authentication → SMTP Settings** : obligatoire en production (l'envoi intégré de Supabase est
-   limité à quelques emails par heure). Utiliser le SMTP gratuit de **Brevo** (300 emails/jour),
-   expéditeur par ex. `bonjour@<votre domaine>`.
-7. **Settings → API** : noter `Project URL`, la clé `anon` (publique) et la clé `service_role` (**secrète**).
+1. vercel.com → **Add New → Project** → importer le dépôt `stocksbodyclub`.
+2. **Root Directory** : `plateforme` · Framework : Next.js (détecté).
+3. Ne pas déployer tout de suite : passer d'abord aux étapes 2 à 4 (sinon le premier déploiement échoue faute de base).
 
-## 2. Vercel (le site)
+## 2. Ajouter la base Neon (depuis Vercel)
 
-1. vercel.com → **Add New → Project** → importer le dépôt GitHub `stocksbodyclub`
-2. **Root Directory** : `plateforme` · Framework : Next.js (détecté automatiquement)
-3. **Environment Variables** :
+1. Dans le projet Vercel : **Storage → Create Database → Neon** (Postgres serverless).
+   - Région : **Frankfurt (eu-central-1)** — la plus proche de la France
+   - Vercel ajoute automatiquement `DATABASE_URL` et `DATABASE_URL_UNPOOLED` aux variables du projet.
+2. Rien d'autre à faire : **les tables, règles, cartes et cours sont installés automatiquement à chaque
+   déploiement** (`npm run vercel-build` applique les migrations manquantes, une seule fois chacune).
 
-   | Variable | Valeur | Secrète |
-   |---|---|---|
-   | `NEXT_PUBLIC_SUPABASE_URL` | Project URL Supabase | non |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | clé `anon` | non |
-   | `NEXT_PUBLIC_SITE_URL` | `https://<votre domaine>` | non |
-   | `SUPABASE_SERVICE_ROLE_KEY` | clé `service_role` | **oui** |
-   | `BREVO_API_KEY` | clé API Brevo (SMS) — facultatif au début | **oui** |
-   | `SMS_SENDER` | `BodyClub` | non |
+## 3. Ajouter le stockage des photos
 
-   Stripe (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) viendra avec le paiement en ligne.
-4. **Deploy**. Puis **Settings → Git → Production Branch** : `claude/body-club-booking-platform-ws6cs5`
-   (ou la branche `main` si le code y est fusionné).
-5. **Settings → Functions → Region** : `cdg1` (Paris), au plus près de la base.
-6. **Settings → Domains** : ajouter votre domaine (ex. `reservation.thebodyclub-portovecchio.com`)
-   et créer chez votre registrar l'enregistrement DNS indiqué par Vercel.
-   Reporter ce domaine dans Supabase (étape 1.3) et dans `NEXT_PUBLIC_SITE_URL`, puis redéployer.
+**Storage → Create Database → Blob** → l'associer au projet : Vercel ajoute `BLOB_READ_WRITE_TOKEN`.
 
-## 3. Premier accès administrateur
+## 4. Variables d'environnement (Settings → Environment Variables)
 
-1. Sur le site en ligne, **Créer mon compte** avec votre email.
-2. Supabase → **SQL Editor** :
-   ```sql
-   update public.profiles set role = 'admin' where email = 'votre@email.fr';
-   ```
-3. Se reconnecter : vous arrivez sur `/admin`.
-4. Compléter **Réglages** (raison sociale, adresse, SIRET, n° TVA : obligatoires sur les factures),
-   **Site internet** (adresse, horaires, photos), **Professeurs**, **Cours proposés**, puis le **Planning**.
+| Variable | Valeur | Secrète |
+|---|---|---|
+| `NEXT_PUBLIC_SITE_URL` | `https://<votre domaine>` (ou l'adresse `….vercel.app` au début) | non |
+| `BETTER_AUTH_SECRET` | chaîne aléatoire de 32+ caractères (`openssl rand -base64 32`, ou un générateur de mots de passe) | **oui** |
+| `BREVO_API_KEY` | clé API Brevo (emails + SMS) | **oui** |
+| `EMAIL_FROM` | adresse d'envoi validée dans Brevo, ex. `bonjour@thebodyclub-portovecchio.com` | non |
+| `EMAIL_FROM_NAME` | `The Body Club` | non |
+| `SMS_SENDER` | `BodyClub` (11 caractères max) | non |
 
-## 4. Avant d'ouvrir aux clientes
+`DATABASE_URL`, `DATABASE_URL_UNPOOLED` et `BLOB_READ_WRITE_TOKEN` sont ajoutées par Vercel (étapes 2 et 3).
 
-- [ ] Faire relire les CGV et la politique de confidentialité
-- [ ] Brevo : compte, crédits SMS, clé API dans Vercel (sinon les SMS restent « simulés »)
+> **Sans Brevo, les clientes ne reçoivent pas l'email de confirmation et ne peuvent pas activer leur
+> compte.** Brevo est donc nécessaire avant d'ouvrir les inscriptions (offre gratuite : 300 emails/jour).
+> Dans Brevo : valider le domaine d'envoi (enregistrements DNS fournis par Brevo), créer une clé API,
+> acheter quelques crédits SMS.
+
+## 5. Déployer
+
+1. **Deployments → Redeploy** (ou Deploy). Le journal affiche `→ 2026…_platform.sql … ok`, etc.
+2. **Settings → Git → Production Branch** : `claude/body-club-booking-platform-ws6cs5`.
+3. **Settings → Functions → Function Region** : `fra1` (Francfort), à côté de la base Neon.
+4. **Settings → Domains** : ajouter votre domaine (ex. `reservation.thebodyclub-portovecchio.com`) et créer
+   l'enregistrement DNS indiqué ; reporter l'adresse dans `NEXT_PUBLIC_SITE_URL`, puis redéployer.
+
+## 6. Créer votre compte administrateur
+
+Depuis un ordinateur avec Node.js, dans le dossier `plateforme` :
+
+```bash
+npm install
+npx vercel link            # relie le dossier au projet Vercel
+npx vercel env pull .env.local
+npm run admin:create -- votre@email.fr Prénom Nom
+```
+
+Un **mot de passe temporaire** s'affiche une seule fois : connectez-vous sur `/connexion`, vous choisirez
+alors votre propre mot de passe et arriverez sur `/admin`.
+
+Puis compléter : **Réglages** (raison sociale, adresse, SIRET, n° TVA — obligatoires sur les factures),
+**Site internet** (adresse, horaires, photos), **Professeurs**, **Cours proposés**, **Planning**.
+
+## 7. Avant d'ouvrir aux clientes
+
+- [ ] Brevo configuré (emails + SMS) et testé : inscription, mot de passe oublié, annulation d'un cours
+- [ ] CGV et politique de confidentialité relues
 - [ ] Stripe : paiement en ligne (étape suivante du projet)
-- [ ] Sauvegardes : l'offre gratuite de Supabase n'en propose pas de téléchargeables →
-      passer à Supabase Pro, ou mettre en place la sauvegarde quotidienne automatique (à faire)
-- [ ] Import des clientes et crédits depuis bsport (à faire)
+- [ ] Sauvegardes : Neon garde un historique de restauration (« point-in-time ») — 1 jour en offre gratuite,
+      7 jours ou plus en offre payante ; prévoir en plus un export régulier
+- [ ] Import des clientes et crédits depuis bsport
 
 ## Coûts
 
 | Service | Offre | Coût |
 |---|---|---|
-| Supabase | Free (500 Mo, 50 000 comptes) | 0 € — Pro 25 $/mois pour les sauvegardes |
-| Vercel | **Hobby : usage non commercial uniquement** | 0 € pour tester ; **Pro 20 $/mois** pour un site commercial |
-| Brevo | SMTP gratuit ; SMS prépayés | ≈ 4 à 5 centimes par SMS en France |
+| Vercel | **Hobby : usage non commercial uniquement** | 0 € pour tester ; **Pro ≈ 20 $/mois** pour un site commercial |
+| Neon | Free (0,5 Go, mise en veille après inactivité) | 0 € au lancement ; Launch ≈ 19 $/mois si besoin |
+| Vercel Blob | Inclus (quelques Go) | 0 € à ce volume |
+| Brevo | Emails : 300/jour gratuits · SMS prépayés | ≈ 4 à 5 centimes par SMS en France |
 | Stripe | Sans abonnement | ≈ 1,5 % + 0,25 € par paiement par carte européenne |
-| Nom de domaine | — | ≈ 10 à 15 € par an (si pas déjà le vôtre) |
+| Nom de domaine | — | ≈ 10 à 15 € par an |
 
 Tarifs à vérifier au moment de souscrire.
+
+---
+
+## Développement local
+
+```bash
+cp .env.example .env.local      # DATABASE_URL vers un PostgreSQL local, BETTER_AUTH_SECRET…
+npm install
+npm run db:seed                 # migrations + cartes + cours
+npm run demo                    # données fictives (base locale uniquement)
+npm run dev
+```
+
+Sans clé Brevo, les emails sont simulés : le lien (confirmation, mot de passe) s'affiche dans le terminal.

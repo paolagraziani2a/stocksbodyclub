@@ -485,11 +485,11 @@ begin
     values ('site', 'site', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
     on conflict (id) do nothing;
 
-    execute $p$create policy "site images admin insert" on storage.objects for insert to authenticated
+    execute $p$create policy "site images admin insert" on storage.objects for insert to app_authenticated
       with check (bucket_id = 'site' and public.is_admin())$p$;
-    execute $p$create policy "site images admin update" on storage.objects for update to authenticated
+    execute $p$create policy "site images admin update" on storage.objects for update to app_authenticated
       using (bucket_id = 'site' and public.is_admin())$p$;
-    execute $p$create policy "site images admin delete" on storage.objects for delete to authenticated
+    execute $p$create policy "site images admin delete" on storage.objects for delete to app_authenticated
       using (bucket_id = 'site' and public.is_admin())$p$;
   end if;
 end $$;
@@ -497,56 +497,56 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- 6. Sécurité des nouveaux objets
 -- ---------------------------------------------------------------------------
-revoke all on public.invoice_counters, public.invoices, public.site_appearance from anon, authenticated;
-revoke execute on all functions in schema public from public, anon, authenticated;
-grant all on public.invoice_counters, public.invoices, public.site_appearance to service_role;
-grant execute on all functions in schema public to service_role;
+revoke all on public.invoice_counters, public.invoices, public.site_appearance from app_anon, app_authenticated;
+revoke execute on all functions in schema public from public, app_anon, app_authenticated;
+grant all on public.invoice_counters, public.invoices, public.site_appearance to app_service;
+grant execute on all functions in schema public to app_service;
 
 alter table public.invoice_counters enable row level security;
 alter table public.invoices enable row level security;
 alter table public.site_appearance enable row level security;
 
-grant select on public.invoices to authenticated;
+grant select on public.invoices to app_authenticated;
 create policy "own invoices" on public.invoices for select using (user_id = auth.uid() or public.is_admin());
 
-grant select on public.site_appearance to anon, authenticated;
+grant select on public.site_appearance to app_anon, app_authenticated;
 grant update (color_background, color_surface, color_text, color_muted, color_accent, color_line,
               heading_font, body_font, button_shape, logo_url, hero_image_url, hero_kicker, hero_title,
               hero_subtitle, about_title, about_text, address, contact_email, contact_phone, instagram_url)
-  on public.site_appearance to authenticated;
+  on public.site_appearance to app_authenticated;
 create policy "appearance readable" on public.site_appearance for select using (true);
 create policy "appearance admin update" on public.site_appearance for update using (public.is_admin()) with check (public.is_admin());
 
 grant update (legal_name, legal_form, legal_address, siret, vat_number, invoice_footer, unlimited_late_cancel_limit)
-  on public.studio_settings to authenticated;
+  on public.studio_settings to app_authenticated;
 
 -- (la révocation globale ci-dessus a retiré les droits accordés en 0003 : on les rétablit)
-grant execute on function public.is_admin()            to anon, authenticated;
-grant execute on function public.current_teacher_id()  to anon, authenticated;
-grant execute on function public.current_app_role()    to authenticated;
-grant execute on function public.compute_expiry(timestamptz, integer, public.validity_unit, text) to anon, authenticated;
-grant execute on function public.book_session(uuid)          to authenticated;
-grant execute on function public.cancel_booking(uuid)        to authenticated;
-grant execute on function public.join_waitlist(uuid)         to authenticated;
-grant execute on function public.leave_waitlist(uuid)        to authenticated;
-grant execute on function public.create_pending_order(uuid)  to authenticated;
-grant execute on function public.my_credit_balance()         to authenticated;
-grant execute on function public.session_roster(uuid)                          to authenticated;
-grant execute on function public.set_attendance(uuid, public.booking_status)   to authenticated;
-grant execute on function public.admin_book_session(uuid, uuid)                to authenticated;
-grant execute on function public.admin_cancel_booking(uuid, boolean)           to authenticated;
-grant execute on function public.admin_cancel_session(uuid, text)              to authenticated;
-grant execute on function public.admin_grant_pass(uuid, text, integer, integer, public.validity_unit, numeric, uuid, text, timestamptz, timestamptz, public.pass_source, integer, numeric) to authenticated;
-grant execute on function public.admin_adjust_pass(uuid, integer, text)        to authenticated;
-grant execute on function public.admin_set_pass_expiry(uuid, timestamptz, text) to authenticated;
-grant execute on function public.admin_set_role(uuid, public.app_role)         to authenticated;
+grant execute on function public.is_admin()            to app_anon, app_authenticated;
+grant execute on function public.current_teacher_id()  to app_anon, app_authenticated;
+grant execute on function public.current_app_role()    to app_authenticated;
+grant execute on function public.compute_expiry(timestamptz, integer, public.validity_unit, text) to app_anon, app_authenticated;
+grant execute on function public.book_session(uuid)          to app_authenticated;
+grant execute on function public.cancel_booking(uuid)        to app_authenticated;
+grant execute on function public.join_waitlist(uuid)         to app_authenticated;
+grant execute on function public.leave_waitlist(uuid)        to app_authenticated;
+grant execute on function public.create_pending_order(uuid)  to app_authenticated;
+grant execute on function public.my_credit_balance()         to app_authenticated;
+grant execute on function public.session_roster(uuid)                          to app_authenticated;
+grant execute on function public.set_attendance(uuid, public.booking_status)   to app_authenticated;
+grant execute on function public.admin_book_session(uuid, uuid)                to app_authenticated;
+grant execute on function public.admin_cancel_booking(uuid, boolean)           to app_authenticated;
+grant execute on function public.admin_cancel_session(uuid, text)              to app_authenticated;
+grant execute on function public.admin_grant_pass(uuid, text, integer, integer, public.validity_unit, numeric, uuid, text, timestamptz, timestamptz, public.pass_source, integer, numeric) to app_authenticated;
+grant execute on function public.admin_adjust_pass(uuid, integer, text)        to app_authenticated;
+grant execute on function public.admin_set_pass_expiry(uuid, timestamptz, text) to app_authenticated;
+grant execute on function public.admin_set_role(uuid, public.app_role)         to app_authenticated;
 
-grant execute on function public.admin_create_sessions(text, date, time, integer, uuid, integer, uuid, integer, text) to authenticated;
-grant execute on function public.admin_update_session(uuid, text, date, time, integer, uuid, integer, text) to authenticated;
-grant execute on function public.admin_copy_week(date, date, integer)  to authenticated;
-grant execute on function public.admin_teacher_pay(date, date)         to authenticated;
-grant execute on function public.admin_teacher_pay_detail(date, date)  to authenticated;
-grant execute on function public.my_teacher_pay(date, date)            to authenticated;
-grant execute on function public.admin_revenue_summary(date, date)     to authenticated;
-grant execute on function public.admin_dashboard()                     to authenticated;
-grant execute on function public.admin_top_clients(date, date, integer) to authenticated;
+grant execute on function public.admin_create_sessions(text, date, time, integer, uuid, integer, uuid, integer, text) to app_authenticated;
+grant execute on function public.admin_update_session(uuid, text, date, time, integer, uuid, integer, text) to app_authenticated;
+grant execute on function public.admin_copy_week(date, date, integer)  to app_authenticated;
+grant execute on function public.admin_teacher_pay(date, date)         to app_authenticated;
+grant execute on function public.admin_teacher_pay_detail(date, date)  to app_authenticated;
+grant execute on function public.my_teacher_pay(date, date)            to app_authenticated;
+grant execute on function public.admin_revenue_summary(date, date)     to app_authenticated;
+grant execute on function public.admin_dashboard()                     to app_authenticated;
+grant execute on function public.admin_top_clients(date, date, integer) to app_authenticated;

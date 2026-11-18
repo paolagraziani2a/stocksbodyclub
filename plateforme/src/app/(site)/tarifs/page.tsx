@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Display, Label, ProductCard, Section } from "@/components/site";
-import { getProducts } from "@/lib/site";
-import { createClient } from "@supabase/supabase-js";
-import { publicEnv } from "@/lib/env";
+import { getProducts, getPublicSettings } from "@/lib/site";
 
 // Régénérée au plus toutes les 60 s (et immédiatement après une modification depuis l'admin)
 export const revalidate = 60;
@@ -10,11 +8,7 @@ export const revalidate = 60;
 export const metadata: Metadata = { title: "Tarifs", description: "Cartes de cours et abonnement illimité." };
 
 export default async function PricesPage() {
-  const supabase = createClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, { auth: { persistSession: false } });
-  const [products, { data: rules }] = await Promise.all([
-    getProducts(),
-    supabase.from("studio_settings").select("cancel_window_hours, unlimited_late_cancel_limit").single(),
-  ]);
+  const [products, rules] = await Promise.all([getProducts(), getPublicSettings()]);
   const hours = rules?.cancel_window_hours ?? 12;
 
   return (

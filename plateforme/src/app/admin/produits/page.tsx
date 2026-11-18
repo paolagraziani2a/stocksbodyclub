@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Field, Input, PageHeader, Select } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { adminTx, requireAdmin } from "@/lib/auth";
 import { formatEuros } from "@/lib/money";
-import { createClient } from "@/lib/supabase/server";
 import { saveProduct } from "./actions";
 
 export const metadata: Metadata = { title: "Cartes & tarifs" };
@@ -44,8 +43,7 @@ function ProductFields({ p }: { p?: Product }) {
 
 export default async function ProductsPage() {
   await requireAdmin();
-  const supabase = await createClient();
-  const { data } = await supabase.from("products").select("*").order("sort_order").returns<Product[]>();
+  const data = await adminTx((tx) => tx.many<Product>("select * from public.products order by sort_order"));
 
   return (
     <>

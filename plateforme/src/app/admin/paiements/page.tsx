@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge, Card, Empty, PageHeader, Stat, Table, buttonStyles, cn } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { adminTx, requireAdmin } from "@/lib/auth";
 import { formatDate, formatTime, parisDay } from "@/lib/dates";
 import { formatEuros } from "@/lib/money";
 import { stripeLinks } from "@/lib/stripe-links";
-import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Paiements & factures" };
 
@@ -51,16 +50,18 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/admin/p
   const { from, to } = monthRange(month);
   const inMonth = (iso: string | null) => !!iso && parisDay(iso).startsWith(month);
   const links = stripeLinks();
-  const supabase = await createClient();
-
-  const [{ data: orders }, { data: invoices }] = await Promise.all([
-    supabase.from("orders")
-      .select("id, status, product_name, amount_subtotal_cents, amount_total_cents, amount_discount_cents, amount_refunded_cents, stripe_fee_cents, promotion_code, paid_at, created_at, stripe_payment_intent_id, profiles(first_name, last_name, email), invoices(id, number, kind)")
-      .gte("created_at", from).lt("created_at", to).order("created_at", { ascending: false }).returns<Order[]>(),
-    supabase.from("invoices")
-      .select("id, number, kind, issued_at, total_ttc_cents, total_ht_cents, total_vat_cents, buyer")
-      .gte("issued_at", from).lt("issued_at", to).order("issued_at", { ascending: false }).returns<Invoice[]>(),
-  ]);
+  const { orders, invoices } = await adminTx(async (tx) => ({
+    orders: await tx.many<Order>(
+      `select o.id, o.status, o.product_name, o.amount_subtotal_cents, o.amount_total_cents, o.amount_discount_cents,
+              o.amount_refunded_cents, o.stripe_fee_cents, o.promotion_code, o.paid_at, o.created_at, o.stripe_payment_intent_id,
+              json_build_object('first_name', p.first_name, 'last_name', p.last_name, 'email', p.email) as profiles,
+              coalesce((select json_agg(json_build_object('id', i.id, 'number', i.number, 'kind', i.kind)) from public.invoices i where i.order_id = o.id), '[]') as invoices
+       from public.orders o join public.profiles p on p.id = o.user_id
+       where o.created_at >= $1 and o.created_at < $2 order by o.created_at desc`, [from, to]),
+    invoices: await tx.many<Invoice>(
+      `select id, number, kind, issued_at, total_ttc_cents, total_ht_cents, total_vat_cents, buyer
+       from public.invoices where issued_at >= $1 and issued_at < $2 order by issued_at desc`, [from, to]),
+  }));
 
   const monthOrders = (orders ?? []).filter((o) => inMonth(o.created_at));
   const monthInvoices = (invoices ?? []).filter((i) => inMonth(i.issued_at));

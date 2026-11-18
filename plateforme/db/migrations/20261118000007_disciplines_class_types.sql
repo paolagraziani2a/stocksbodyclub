@@ -31,7 +31,7 @@ create trigger audit after insert or update or delete on public.class_types for 
 alter table public.teachers
   add column disciplines text[] not null default '{lagree}'
     check (disciplines <@ array['lagree', 'yoga', 'mat_pilates']::text[] and cardinality(disciplines) >= 1);
-grant select (disciplines) on public.teachers to anon, authenticated;
+grant select (disciplines) on public.teachers to app_anon, app_authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 3. Création de cours : le type fixe le nom, la durée et la capacité par défaut
@@ -110,5 +110,5 @@ begin
 end $$;
 
 drop function if exists public.admin_update_session(uuid, text, date, time, integer, uuid, integer, text);
-grant execute on function public.admin_update_session(uuid, text, date, time, integer, uuid, integer, text, uuid) to authenticated;
-grant execute on function public.admin_create_sessions(text, date, time, integer, uuid, integer, uuid, integer, text) to authenticated;
+grant execute on function public.admin_update_session(uuid, text, date, time, integer, uuid, integer, text, uuid) to app_authenticated;
+grant execute on function public.admin_create_sessions(text, date, time, integer, uuid, integer, uuid, integer, text) to app_authenticated;

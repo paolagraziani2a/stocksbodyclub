@@ -2,9 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireAdmin, type ActionResult } from "@/lib/auth";
-import { errorMessage } from "@/lib/errors";
-import { createClient } from "@/lib/supabase/server";
+import { adminRun, type ActionResult } from "@/lib/auth";
 
 const checkbox = z.preprocess((v) => v === "on", z.boolean());
 
@@ -27,15 +25,13 @@ const schema = z.object({
 });
 
 export async function saveSettings(_p: ActionResult, form: FormData): Promise<ActionResult> {
-  await requireAdmin();
   const raw = Object.fromEntries(form.entries());
   raw.siret = String(raw.siret ?? "").replace(/\s/g, "");
   const parsed = schema.safeParse(raw);
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("studio_settings").update(parsed.data).eq("id", true);
-  if (error) return { ok: false, message: errorMessage(error) };
+  const r = await adminRun((tx) => tx.update("public.studio_settings", parsed.data, true));
+  if (!r.ok) return { ok: false, message: r.message };
   revalidatePath("/admin", "layout");
   revalidatePath("/tarifs");
   return { ok: true, message: "Réglages enregistrés." };

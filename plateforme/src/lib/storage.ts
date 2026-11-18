@@ -1,6 +1,8 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { put } from "@vercel/blob";
 
 const IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -11,15 +13,27 @@ export function hasFile(v: FormDataEntryValue | null): v is File {
 }
 
 /**
- * Envoie une image dans le stockage public « site » (écriture réservée à l'admin par la RLS).
- * SVG refusé : un SVG peut contenir du script.
+ * Enregistre une image publique (logo, photos du studio, portraits des coachs).
+ * Production : Vercel Blob (BLOB_READ_WRITE_TOKEN). Développement sans jeton : dossier public/uploads.
+ * SVG refusé : un SVG peut contenir du script. Contrôle admin fait par l'action appelante.
  */
-export async function uploadImage(supabase: SupabaseClient, file: File, prefix: string): Promise<string> {
+export async function uploadImage(file: File, prefix: string): Promise<string> {
   const ext = IMAGE_TYPES[file.type];
   if (!ext) throw new Error("Format accepté : JPG, PNG ou WebP.");
   if (file.size > MAX_IMAGE_BYTES) throw new Error("Image trop lourde (5 Mo maximum).");
-  const path = `${prefix}/${randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from("site").upload(path, file, { contentType: file.type, cacheControl: "31536000" });
-  if (error) throw new Error("Envoi de l'image impossible.");
-  return supabase.storage.from("site").getPublicUrl(path).data.publicUrl;
+  const name = `${prefix}/${randomUUID()}.${ext}`;
+
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      const blob = await put(name, file, { access: "public", contentType: file.type, addRandomSuffix: false, cacheControlMaxAge: 31536000 });
+      return blob.url;
+    } catch {
+      throw new Error("Envoi de l'image impossible.");
+    }
+  }
+  if (process.env.NODE_ENV === "production") throw new Error("Stockage des photos non configuré (Vercel Blob).");
+  const dir = path.join(process.cwd(), "public", "uploads", prefix);
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(process.cwd(), "public", "uploads", name), Buffer.from(await file.arrayBuffer()));
+  return `/uploads/${name}`;
 }

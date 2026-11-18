@@ -8,7 +8,7 @@ import { signIn } from "@/lib/account-actions";
 export const metadata: Metadata = { title: "Connexion" };
 
 export default async function LoginPage({ searchParams }: PageProps<"/connexion">) {
-  const { suite, lien } = await searchParams;
+  const { suite, lien, mdp } = await searchParams;
   const next = typeof suite === "string" ? suite : "";
   return (
     <AuthShell
@@ -16,6 +16,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/connexion"
       intro="Connectez-vous avec votre email et votre mot de passe pour réserver vos cours et suivre vos cartes."
       footer={<>Pas encore de compte ? <Link href={`/inscription${next ? `?suite=${encodeURIComponent(next)}` : ""}`} className="text-ink underline underline-offset-4">Créer mon compte</Link></>}
     >
+      {mdp && (
+        <p role="status" className="mb-5 rounded-xl bg-blush px-4 py-3 text-sm">Votre nouveau mot de passe est enregistré : connectez-vous.</p>
+      )}
       {lien === "expire" && (
         <p className="mb-5 rounded-xl bg-blush px-4 py-3 text-sm">Ce lien a expiré ou a déjà été utilisé. Connectez-vous, ou demandez un nouveau lien.</p>
       )}

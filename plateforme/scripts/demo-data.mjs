@@ -1,36 +1,25 @@
-// Données de démonstration pour le Supabase LOCAL uniquement (npx supabase start).
-// Usage : npm run demo
-// Crée : 1 admin (Pao), 2 professeurs, 12 clientes, 3 semaines de planning, des ventes et des réservations.
-import { createClient } from "@supabase/supabase-js";
+// Données de démonstration — base LOCALE uniquement (DATABASE_URL sur localhost).
+// Usage : npm run demo   (après npm run db:migrate)
+// Crée : 1 admin (Pao), des professeurs, 12 clientes, 3 semaines de planning, des ventes et des réservations.
 import pg from "pg";
+import { createAccount } from "./lib/users.mjs";
 
-const API = "http://127.0.0.1:54321";
-const DB = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!SERVICE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY manquant (voir .env.local)");
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.includes("127.0.0.1")) throw new Error("Refus : ce script ne vise que le Supabase local.");
-
-const supabase = createClient(API, SERVICE_KEY, { auth: { persistSession: false } });
+const DB = process.env.DATABASE_URL;
+if (!DB || !/@(localhost|127\.0\.0\.1)[:/]/.test(DB)) throw new Error("Refus : ce script ne vise qu'une base locale (DATABASE_URL sur localhost).");
 const db = new pg.Client({ connectionString: DB });
 await db.connect();
 
 let phoneSeq = 10;
 async function user(email, first, last, role = "client") {
-  const { data, error } = await supabase.auth.admin.createUser({
-    email, password: "bodyclub2026", email_confirm: true,
-    // numéros fictifs (plage réservée aux fictions par l'ARCEP : 06 39 98 xx xx)
-    user_metadata: { first_name: first, last_name: last, terms_accepted: "true", phone: `+336399800${phoneSeq++}` },
-  });
-  if (error) throw error;
-  if (role !== "client") await db.query("update public.profiles set role = $2 where id = $1", [data.user.id, role]);
-  return data.user.id;
+  // numéros fictifs (plage réservée aux fictions par l'ARCEP : 06 39 98 xx xx)
+  return createAccount(db, { email, password: "bodyclub2026", firstName: first, lastName: last, phone: `+336399800${phoneSeq++}`, role });
 }
 
 /** Exécute une requête « en tant que » l'utilisatrice (auth.uid()), dans une transaction. */
 async function as(uid, sql, params = []) {
   await db.query("begin");
   try {
-    await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: uid, role: "authenticated" })]);
+    await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: uid })]);
     const r = await db.query(sql, params);
     await db.query("commit");
     return r.rows;
@@ -158,14 +147,14 @@ Vestiaires, douches et serviettes fournies.',
   contact_email = 'bonjour@bodyclub.test', contact_phone = '01 23 45 67 89',
   instagram_url = 'https://instagram.com/thebodyclub'`);
 
-// Photos du studio (images de démonstration)
-const { readFileSync, readdirSync } = await import("node:fs");
+// Photos du studio (images de démonstration) : copiées dans public/uploads (comme le stockage local de l'app)
+const { copyFileSync, mkdirSync, readdirSync } = await import("node:fs");
 const dir = new URL("./demo-images/", import.meta.url);
+const target = new URL("../public/uploads/studio/", import.meta.url);
+mkdirSync(target, { recursive: true });
 for (const [i, f] of readdirSync(dir).sort().entries()) {
-  const path = `studio/demo-${f}`;
-  await supabase.storage.from("site").upload(path, readFileSync(new URL(f, dir)), { contentType: "image/jpeg", upsert: true });
-  const url = supabase.storage.from("site").getPublicUrl(path).data.publicUrl;
-  await db.query("insert into public.site_photos (url, alt, sort_order) values ($1, $2, $3)", [url, `Le studio — photo ${i + 1}`, i]);
+  copyFileSync(new URL(f, dir), new URL(`demo-${f}`, target));
+  await db.query("insert into public.site_photos (url, alt, sort_order) values ($1, $2, $3)", [`/uploads/studio/demo-${f}`, `Le studio — photo ${i + 1}`, i]);
 }
 
 console.log("Données de démonstration créées.");

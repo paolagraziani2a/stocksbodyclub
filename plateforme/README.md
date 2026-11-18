@@ -3,8 +3,9 @@
 Alternative privée à bsport : planning, réservations, cartes de cours, paiements
 Stripe, professeurs et tableau de bord, pour le studio de Lagree The Body Club.
 
-**Stack** : Next.js 16 (App Router, TypeScript) · Tailwind CSS · Supabase
-(PostgreSQL, Auth, RLS, Realtime) · Stripe Checkout + webhooks · Vercel/Netlify.
+**Stack** : Next.js 16 (App Router, TypeScript) · Tailwind CSS · **Neon** (PostgreSQL, RLS) ·
+**Better Auth** (comptes email + mot de passe) · Vercel Blob (photos) · Brevo (emails, SMS) ·
+Stripe Checkout + webhooks · hébergement **Vercel**. Mise en ligne : voir [DEPLOIEMENT.md](DEPLOIEMENT.md).
 
 ## Règles du studio (validées)
 
@@ -38,14 +39,14 @@ Stripe, professeurs et tableau de bord, pour le studio de Lagree The Body Club.
 Navigateur / PWA ──► Next.js (Server Components, Server Actions, /api/stripe/webhook, /api/cron)
                          │
                          ▼
-                   Supabase PostgreSQL
+                   PostgreSQL (Neon) — le serveur endosse le rôle de la personne connectée
                    ├─ RLS : chacune ne lit que ses données
                    └─ Fonctions transactionnelles : seule voie d'écriture
                       book_session · cancel_booking · process_checkout_completed · process_refund
                       expire_passes · admin_* · join_waitlist · set_attendance
 ```
 
-**Toutes les règles critiques vivent dans PostgreSQL** (`supabase/migrations/`) :
+**Toutes les règles critiques vivent dans PostgreSQL** (`db/migrations/`) :
 
 - une réservation = une transaction : verrou du cours → verrou de la cliente →
   choix de la carte → débit → historique → place occupée ;
@@ -69,14 +70,14 @@ Navigateur / PWA ──► Next.js (Server Components, Server Actions, /api/stri
 ## Structure
 
 ```
-supabase/
-  migrations/   schéma, fonctions métier, sécurité (RLS + droits)
-  seed.sql      cartes actuelles, type de cours
-  tests/        shim Supabase pour tester sur PostgreSQL ordinaire
+db/
+  migrations/   socle (rôles, comptes), schéma, fonctions métier, sécurité (RLS + droits)
+  seed.sql      cartes, cours proposés
+scripts/        migrate.mjs (migrations), create-admin.mjs, demo-data.mjs
 src/
-  app/          pages (App Router)
-  lib/          clients Supabase (navigateur / serveur / service), erreurs, montants
-  proxy.ts      rafraîchissement de session, protection /compte /admin /prof
+  app/          pages (App Router) ; api/auth : liens reçus par email
+  lib/          db.ts (transactions par rôle), auth-server.ts (Better Auth), email, SMS, stockage
+  proxy.ts      protection /compte /admin /prof
 tests/db/       tests des règles critiques contre une vraie base PostgreSQL
 ```
 
@@ -88,12 +89,11 @@ npm install
 npm run dev
 ```
 
-### Supabase local et données de démonstration
+### Base locale et données de démonstration
 
 ```bash
-npx supabase start          # Docker requis
-npx supabase db reset       # applique migrations + seed
-npm run demo                # admin pao@bodyclub.test / bodyclub2026
+npm run db:seed             # migrations + cartes + cours (DATABASE_URL de .env.local)
+npm run demo                # admin pao@bodyclub.test / bodyclub2026 (base locale uniquement)
 npm run dev                 # http://localhost:3000/admin
 ```
 

@@ -1,4 +1,4 @@
-name: Plateforme (Next.js + Supabase)
+name: Plateforme (Next.js + PostgreSQL)
 
 on:
   push:
@@ -22,6 +22,8 @@ jobs:
           --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       TEST_DATABASE_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
+      # base utilisée par la compilation (pages pré-générées : coachs, tarifs)
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,4 +35,5 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - run: node scripts/migrate.mjs --seed
       - run: npm run build

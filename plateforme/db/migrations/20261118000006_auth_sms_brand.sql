@@ -9,7 +9,7 @@ alter table public.profiles
   add column sms_opt_in            boolean not null default true,   -- SMS de service (cours annulé)
   add column must_change_password  boolean not null default false;  -- mot de passe temporaire donné par l'admin
 
-grant update (sms_opt_in) on public.profiles to authenticated;
+grant update (sms_opt_in) on public.profiles to app_authenticated;
 
 -- La cliente renseigne son téléphone à l'inscription
 create or replace function public.tg_handle_new_user() returns trigger
@@ -53,10 +53,10 @@ create table public.notification_log (
 create index notification_log_session_idx on public.notification_log (session_id);
 create index notification_log_created_idx on public.notification_log (created_at desc);
 
-revoke all on public.notification_log from anon, authenticated;
-grant all on public.notification_log to service_role;
+revoke all on public.notification_log from app_anon, app_authenticated;
+grant all on public.notification_log to app_service;
 alter table public.notification_log enable row level security;
-grant select on public.notification_log to authenticated;
+grant select on public.notification_log to app_authenticated;
 create policy "notifications admin read" on public.notification_log for select using (public.is_admin());
 
 -- ---------------------------------------------------------------------------
@@ -124,10 +124,10 @@ update public.site_appearance set
   hero_subtitle = 'Bouger, se soigner, respirer. Réservez votre séance de Lagree en quelques secondes.'
 where id;
 
-grant update (hero_title_accent, color_feature, marquee_text) on public.site_appearance to authenticated;
+grant update (hero_title_accent, color_feature, marquee_text) on public.site_appearance to app_authenticated;
 
-grant execute on function public.clear_must_change_password() to authenticated;
-grant execute on function public.create_pending_order(uuid) to authenticated;
+grant execute on function public.clear_must_change_password() to app_authenticated;
+grant execute on function public.create_pending_order(uuid) to app_authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 5. Vente au studio (carte bancaire sur place, espèces…) : commande payée,
@@ -236,5 +236,5 @@ begin
   return jsonb_build_object('order_id', v_order.id, 'pass_id', v_pass.id);
 end $$;
 
-revoke execute on function public._payment_label(text) from public, anon, authenticated;
-grant execute on function public.admin_sell_product(uuid, uuid, text, integer) to authenticated;
+revoke execute on function public._payment_label(text) from public, app_anon, app_authenticated;
+grant execute on function public.admin_sell_product(uuid, uuid, text, integer) to app_authenticated;

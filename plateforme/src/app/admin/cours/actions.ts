@@ -2,9 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireAdmin, type ActionResult } from "@/lib/auth";
-import { errorMessage } from "@/lib/errors";
-import { createClient } from "@/lib/supabase/server";
+import { adminRun, type ActionResult } from "@/lib/auth";
 
 const schema = z.object({
   id: z.string().uuid().optional(),
@@ -21,16 +19,12 @@ const schema = z.object({
 });
 
 export async function saveClassType(_p: ActionResult, form: FormData): Promise<ActionResult> {
-  await requireAdmin();
   const parsed = schema.safeParse(Object.fromEntries(form.entries()));
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
   const { id, ...row } = parsed.data;
-  const supabase = await createClient();
   const values = { ...row, description: row.description || null };
-  const { error } = id
-    ? await supabase.from("class_types").update(values).eq("id", id)
-    : await supabase.from("class_types").insert(values);
-  if (error) return { ok: false, message: error.code === "23505" ? "Un cours porte déjà ce nom." : errorMessage(error) };
+  const r = await adminRun(async (tx) => { if (id) await tx.update("public.class_types", values, id); else await tx.insert("public.class_types", values); });
+  if (!r.ok) return { ok: false, message: /duplicate key|unique/.test(r.message + r.code) ? "Un cours porte déjà ce nom." : r.message };
   revalidatePath("/admin/cours");
   revalidatePath("/cours");
   revalidatePath("/");

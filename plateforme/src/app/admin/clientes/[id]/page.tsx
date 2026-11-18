@@ -3,11 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Field, Input, PageHeader, Select, Table } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { adminTx, requireAdmin, type Profile } from "@/lib/auth";
 import { formatDate, formatShortDay, formatTime } from "@/lib/dates";
 import { formatEuros } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
-import { createClient } from "@/lib/supabase/server";
 import { adjustPass, sellProduct, sendResetLink, setTemporaryPassword } from "../actions";
 
 export const metadata: Metadata = { title: "Fiche cliente" };
@@ -21,18 +20,24 @@ const BOOKING: Record<string, { label: string; tone: "neutral" | "success" | "da
 export default async function ClientPage({ params }: PageProps<"/admin/clientes/[id]">) {
   await requireAdmin();
   const { id } = await params;
-  const supabase = await createClient();
-  const [{ data: c }, { data: passes }, { data: bookings }, { data: products }, { data: orders }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
-    supabase.from("passes").select("*").eq("user_id", id).order("created_at", { ascending: false }),
-    supabase.from("bookings").select("id, status, class_sessions(title, starts_at)").eq("user_id", id)
-      .order("created_at", { ascending: false }).limit(20)
-      .returns<{ id: string; status: string; class_sessions: { title: string; starts_at: string } }[]>(),
-    supabase.from("products").select("id, name, price_cents").eq("active", true).order("sort_order"),
-    supabase.from("orders").select("id, product_name, amount_total_cents, paid_at, payment_method, invoices(id, number, kind)")
-      .eq("user_id", id).not("paid_at", "is", null).order("paid_at", { ascending: false })
-      .returns<{ id: string; product_name: string; amount_total_cents: number; paid_at: string; payment_method: string; invoices: { id: string; number: string; kind: string }[] }[]>(),
-  ]);
+  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
+  const { c, passes, bookings, products, orders } = await adminTx(async (tx) => ({
+    c: await tx.one<Profile>("select * from public.profiles where id = $1", [id]),
+    passes: await tx.many<{
+      id: string; name: string; is_unlimited: boolean; credits_total: number; credits_remaining: number;
+      unit_value_cents: number; expires_at: string | null; revoked_at: string | null;
+    }>("select * from public.passes where user_id = $1 order by created_at desc", [id]),
+    bookings: await tx.many<{ id: string; status: string; class_sessions: { title: string; starts_at: string } }>(
+      `select b.id, b.status, json_build_object('title', s.title, 'starts_at', s.starts_at) as class_sessions
+       from public.bookings b join public.class_sessions s on s.id = b.session_id
+       where b.user_id = $1 order by b.created_at desc limit 20`, [id]),
+    products: await tx.many<{ id: string; name: string; price_cents: number }>(
+      "select id, name, price_cents from public.products where active order by sort_order"),
+    orders: await tx.many<{ id: string; product_name: string; amount_total_cents: number; paid_at: string; payment_method: string; invoices: { id: string; number: string; kind: string }[] }>(
+      `select o.id, o.product_name, o.amount_total_cents, o.paid_at, o.payment_method,
+              coalesce((select json_agg(json_build_object('id', i.id, 'number', i.number, 'kind', i.kind)) from public.invoices i where i.order_id = o.id), '[]') as invoices
+       from public.orders o where o.user_id = $1 and o.paid_at is not null order by o.paid_at desc`, [id]),
+  }));
   if (!c) notFound();
 
   return (
@@ -57,7 +62,7 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
                 <tbody>
                   {(passes ?? []).map((p) => (
                     <tr key={p.id} className={p.revoked_at ? "opacity-50" : ""}>
-                      <td>{p.name}{p.unit_value_cents === "0.0000" || Number(p.unit_value_cents) === 0 ? <span className="ml-2"><Badge tone="accent">Offerte</Badge></span> : null}</td>
+                      <td>{p.name}{Number(p.unit_value_cents) === 0 ? <span className="ml-2"><Badge tone="accent">Offerte</Badge></span> : null}</td>
                       <td className="text-right tabular-nums">{p.is_unlimited ? "∞" : `${p.credits_remaining}/${p.credits_total}`}</td>
                       <td className="text-sm">{p.revoked_at ? "Remboursée" : p.expires_at ? `jusqu'au ${formatDate(new Date(new Date(p.expires_at).getTime() - 1000))}` : "Non activée"}</td>
                       <td>

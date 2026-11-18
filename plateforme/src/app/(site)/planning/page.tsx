@@ -5,7 +5,9 @@ import { cn } from "@/components/ui";
 import { addDays, formatTime, hoursUntil, isUpcoming, isValidDay, labelOfDay, parisDay } from "@/lib/dates";
 import { DISCIPLINE_ORDER, DISCIPLINES, isDiscipline, LEVELS } from "@/lib/format";
 import { getSessions } from "@/lib/site";
-import { createClient } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/auth";
+import { asUser } from "@/lib/db";
+import { getPublicSettings } from "@/lib/site";
 import { SessionAction } from "./session-action";
 
 export const metadata: Metadata = { title: "Planning", description: "Les prochains cours de Lagree et les places disponibles." };
@@ -26,11 +28,10 @@ export default async function PlanningPage({ searchParams }: PageProps<"/plannin
     return `/planning?${q}`;
   };
 
-  const supabase = await createClient();
-  const [allSessions, { data: { user } }, { data: settings }] = await Promise.all([
+  const [allSessions, user, settings] = await Promise.all([
     getSessions(`${addDays(start, -1)}T00:00:00Z`, `${addDays(start, 8)}T00:00:00Z`),
-    supabase.auth.getUser(),
-    supabase.from("studio_settings").select("cancel_window_hours").single(),
+    getSessionUser(),
+    getPublicSettings(),
   ]);
   const sessions = allSessions.filter((x) =>
     (!discipline || x.class_types?.discipline === discipline) && (!course || x.class_types?.slug === course));
@@ -40,14 +41,16 @@ export default async function PlanningPage({ searchParams }: PageProps<"/plannin
 
   // Réservations et liste d'attente de la cliente connectée, pour ces cours
   const ids = ofDay.map((s) => s.id);
-  const [{ data: mine }, { data: waiting }] = user && ids.length
-    ? await Promise.all([
-        supabase.from("bookings").select("id, session_id").eq("user_id", user.id).eq("status", "booked").in("session_id", ids),
-        supabase.from("waitlist_entries").select("session_id").eq("user_id", user.id).eq("status", "waiting").in("session_id", ids),
-      ])
-    : [{ data: [] }, { data: [] }];
-  const bookingOf = new Map((mine ?? []).map((b) => [b.session_id as string, b.id as string]));
-  const waitingSet = new Set((waiting ?? []).map((w) => w.session_id as string));
+  const { mine, waiting } = user && ids.length
+    ? await asUser(user.id, async (tx) => ({
+        mine: await tx.many<{ id: string; session_id: string }>(
+          "select id, session_id from public.bookings where user_id = auth.uid() and status = 'booked' and session_id = any($1::uuid[])", [ids]),
+        waiting: await tx.many<{ session_id: string }>(
+          "select session_id from public.waitlist_entries where user_id = auth.uid() and status = 'waiting' and session_id = any($1::uuid[])", [ids]),
+      }))
+    : { mine: [], waiting: [] };
+  const bookingOf = new Map(mine.map((b) => [b.session_id, b.id]));
+  const waitingSet = new Set(waiting.map((w) => w.session_id));
   const windowH = settings?.cancel_window_hours ?? 12;
 
   return (

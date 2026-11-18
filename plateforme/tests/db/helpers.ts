@@ -14,9 +14,9 @@ export async function asUser<T>(userId: string | null, fn: (c: PoolClient) => Pr
   const c = await pool.connect();
   try {
     await c.query("begin");
-    await c.query(`set local role ${userId ? "authenticated" : "anon"}`);
+    await c.query(`set local role ${userId ? "app_authenticated" : "app_anon"}`);
     await c.query("select set_config('request.jwt.claims', $1, true)", [
-      JSON.stringify(userId ? { sub: userId, role: "authenticated" } : { role: "anon" }),
+      JSON.stringify(userId ? { sub: userId, role: "app_authenticated" } : { role: "app_anon" }),
     ]);
     const result = await fn(c);
     await c.query("commit");
@@ -29,12 +29,12 @@ export async function asUser<T>(userId: string | null, fn: (c: PoolClient) => Pr
   }
 }
 
-/** Exécute fn en tant que serveur (service_role : webhooks, tâches planifiées). */
+/** Exécute fn en tant que serveur (app_service : webhooks, tâches planifiées). */
 export async function asService<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
   const c = await pool.connect();
   try {
     await c.query("begin");
-    await c.query("set local role service_role");
+    await c.query("set local role app_service");
     const result = await fn(c);
     await c.query("commit");
     return result;

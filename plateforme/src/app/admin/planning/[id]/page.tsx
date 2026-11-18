@@ -3,10 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Field, Input, PageHeader, Table, buttonStyles } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { adminTx, requireAdmin } from "@/lib/auth";
 import { formatDay, formatTime, mondayOf, parisDay, parisTime } from "@/lib/dates";
 import { formatPhone } from "@/lib/phone";
-import { createClient } from "@/lib/supabase/server";
 import { cancelSession, deleteSession, setAttendance, updateSession } from "../actions";
 import { SessionFields, type TeacherOption, type TypeOption } from "../session-fields";
 
@@ -31,16 +30,24 @@ export default async function SessionPage({ params, searchParams }: PageProps<"/
   const { id } = await params;
   const sp = await searchParams;
   const num = (v: unknown) => (typeof v === "string" && /^\d+$/.test(v) ? Number(v) : 0);
-  const supabase = await createClient();
-  const [{ data: s }, { data: teachers }, { data: types }, { data: roster }, { count: waitlist }, { data: sms }] = await Promise.all([
-    supabase.from("class_sessions").select("*, teachers(display_name)").eq("id", id).maybeSingle(),
-    supabase.from("teachers").select("id, display_name, disciplines").eq("active", true).order("display_name").returns<TeacherOption[]>(),
-    supabase.from("class_types").select("id, name, discipline, duration_minutes, default_capacity").eq("active", true).order("sort_order").returns<TypeOption[]>(),
-    supabase.rpc("session_roster", { p_session_id: id }),
-    supabase.from("waitlist_entries").select("id", { count: "exact", head: true }).eq("session_id", id).eq("status", "waiting"),
-    supabase.from("notification_log").select("id, recipient, status, error, created_at, profiles(first_name, last_name)")
-      .eq("session_id", id).order("created_at").returns<SmsRow[]>(),
-  ]);
+  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
+  const { s, teachers, types, roster, waitlist, sms } = await adminTx(async (tx) => ({
+    s: await tx.one<{
+      id: string; title: string; starts_at: string; ends_at: string; capacity: number; booked_count: number; status: string;
+      teacher_id: string | null; class_type_id: string | null; notes: string | null; teachers: { display_name: string } | null;
+    }>(
+      `select s.*, case when t.id is null then null else json_build_object('display_name', t.display_name) end as teachers
+       from public.class_sessions s left join public.teachers t on t.id = s.teacher_id where s.id = $1`, [id]),
+    teachers: await tx.many<TeacherOption>("select id, display_name, disciplines from public.teachers where active order by display_name"),
+    types: await tx.many<TypeOption>("select id, name, discipline, duration_minutes, default_capacity from public.class_types where active order by sort_order"),
+    roster: await tx.many<Roster>("select * from public.session_roster($1)", [id]),
+    waitlist: (await tx.one<{ n: number }>("select count(*)::int as n from public.waitlist_entries where session_id = $1 and status = 'waiting'", [id]))?.n ?? 0,
+    sms: await tx.many<SmsRow>(
+      `select n.id, n.recipient, n.status, n.error, n.created_at,
+              case when p.id is null then null else json_build_object('first_name', p.first_name, 'last_name', p.last_name) end as profiles
+       from public.notification_log n left join public.profiles p on p.id = n.user_id
+       where n.session_id = $1 and n.channel = 'sms' order by n.created_at`, [id]),
+  }));
   if (!s) notFound();
 
   const cancelled = s.status === "cancelled";
@@ -69,11 +76,11 @@ export default async function SessionPage({ params, searchParams }: PageProps<"/
       <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
         <Card>
           <h2 className="text-2xl">Inscrites</h2>
-          {(roster as Roster[] | null)?.length ? (
+          {roster.length ? (
             <Table>
               <thead><tr><th>Cliente</th><th>Statut</th><th className="text-right">Présence</th></tr></thead>
               <tbody>
-                {(roster as Roster[]).map((r) => (
+                {roster.map((r) => (
                   <tr key={r.booking_id}>
                     <td>{r.first_name} {r.last_initial}.</td>
                     <td><Badge tone={STATUS[r.status]?.tone}>{STATUS[r.status]?.label ?? r.status}</Badge></td>

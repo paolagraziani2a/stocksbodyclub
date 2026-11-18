@@ -4,9 +4,8 @@ import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { CoachPortrait } from "@/components/site";
 import { Card, Field, Input, PageHeader, Textarea, buttonStyles } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { adminTx, requireAdmin } from "@/lib/auth";
 import { DISCIPLINE_ORDER, DISCIPLINES } from "@/lib/format";
-import { createClient } from "@/lib/supabase/server";
 import { saveTeacherProfile } from "./actions";
 
 export const metadata: Metadata = { title: "Profil du coach" };
@@ -14,10 +13,14 @@ export const metadata: Metadata = { title: "Profil du coach" };
 export default async function TeacherProfilePage({ params }: PageProps<"/admin/professeurs/[id]">) {
   await requireAdmin();
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: t } = await supabase.from("teachers")
-    .select("id, slug, display_name, headline, quote, bio, photo_url, specialties, certifications, instagram_url, show_on_site, sort_order, active, disciplines")
-    .eq("id", id).maybeSingle();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
+  const t = await adminTx((tx) => tx.one<{
+    id: string; slug: string; display_name: string; headline: string; quote: string; bio: string | null; photo_url: string | null;
+    specialties: string[]; certifications: string; instagram_url: string; show_on_site: boolean; sort_order: number;
+    active: boolean; disciplines: string[];
+  }>(
+    `select id, slug, display_name, headline, quote, bio, photo_url, specialties, certifications, instagram_url,
+            show_on_site, sort_order, active, disciplines from public.teachers where id = $1`, [id]));
   if (!t) notFound();
 
   return (

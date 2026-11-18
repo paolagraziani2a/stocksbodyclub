@@ -3,11 +3,10 @@ import Link from "next/link";
 import { CoachPortrait } from "@/components/site";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Field, Input, PageHeader, Select } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { adminTx, requireAdmin } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { DISCIPLINE_ORDER, DISCIPLINES, type Discipline } from "@/lib/format";
 import { formatEuros } from "@/lib/money";
-import { createClient } from "@/lib/supabase/server";
 import { createTeacher, setPayRule, setTeacherActive } from "./actions";
 
 export const metadata: Metadata = { title: "Professeurs" };
@@ -48,13 +47,16 @@ function ModeFields({ rule }: { rule?: Rule }) {
 
 export default async function TeachersPage() {
   await requireAdmin();
-  const supabase = await createClient();
-  const [{ data: teachers }, { data: settings }] = await Promise.all([
-    supabase.from("teachers")
-      .select("id, display_name, headline, photo_url, active, disciplines, teacher_pay_rules(mode, percent, fixed_cents, per_attendee_cents, valid_from)")
-      .order("active", { ascending: false }).order("display_name").returns<Teacher[]>(),
-    supabase.from("studio_settings").select("teacher_pay_base, late_cancel_counts_for_teacher").single(),
-  ]);
+  const { teachers, settings } = await adminTx(async (tx) => ({
+    teachers: await tx.many<Teacher>(
+      `select t.id, t.display_name, t.headline, t.photo_url, t.active, t.disciplines,
+              coalesce((select json_agg(json_build_object('mode', r.mode, 'percent', r.percent, 'fixed_cents', r.fixed_cents,
+                         'per_attendee_cents', r.per_attendee_cents, 'valid_from', r.valid_from))
+                        from public.teacher_pay_rules r where r.teacher_id = t.id), '[]') as teacher_pay_rules
+       from public.teachers t order by t.active desc, t.display_name`),
+    settings: await tx.one<{ teacher_pay_base: string; late_cancel_counts_for_teacher: boolean }>(
+      "select teacher_pay_base, late_cancel_counts_for_teacher from public.studio_settings"),
+  }));
 
   return (
     <>

@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { adminTx, requireAdmin } from "@/lib/auth";
 import { saveSettings } from "./actions";
 
 export const metadata: Metadata = { title: "Réglages" };
@@ -18,8 +17,12 @@ function Check({ name, label, checked }: { name: string; label: string; checked:
 
 export default async function SettingsPage() {
   await requireAdmin();
-  const supabase = await createClient();
-  const { data: s } = await supabase.from("studio_settings").select("*").single();
+  const s = await adminTx((tx) => tx.one<{
+    studio_name: string; legal_name: string; legal_form: string; legal_address: string; siret: string; vat_number: string;
+    invoice_footer: string; vat_rate: number; cancel_window_hours: number; booking_horizon_days: number;
+    unlimited_late_cancel_limit: number; waitlist_enabled: boolean; teacher_pay_base: string;
+    late_cancel_counts_for_teacher: boolean; no_show_counts_for_teacher: boolean;
+  }>("select * from public.studio_settings"));
   if (!s) return null;
   const missingLegal = !s.siret || !s.legal_address;
 

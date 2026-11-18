@@ -4,19 +4,16 @@ import { DISCIPLINE_ORDER, DISCIPLINES } from "@/lib/format";
 import { cn } from "@/components/ui";
 import { getAppearance } from "@/lib/appearance";
 import { formatShortDay, formatTime } from "@/lib/dates";
-import { createClient } from "@supabase/supabase-js";
-import { publicEnv } from "@/lib/env";
 import { getClassTypes, getCoaches, getPhotos, getProducts, getSessions, mapsLink } from "@/lib/site";
 
 export default async function Home() {
   const now = new Date();
-  const anon = createClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, { auth: { persistSession: false } });
-  const [a, photos, coaches, products, sessions, { data: classType }, types] = await Promise.all([
+  const [a, photos, coaches, products, sessions, types] = await Promise.all([
     getAppearance(), getPhotos(), getCoaches(), getProducts(),
     getSessions(now.toISOString(), new Date(now.getTime() + 7 * 864e5).toISOString()),
-    anon.from("class_types").select("duration_minutes, default_capacity").eq("discipline", "lagree").eq("active", true).limit(1).maybeSingle(),
     getClassTypes(),
   ]);
+  const classType = types.find((t) => t.discipline === "lagree");
   const practices = DISCIPLINE_ORDER.map((d) => ({ d, list: types.filter((t) => t.discipline === d) })).filter((p) => p.list.length);
   const heroImage = a.hero_image_url ?? photos[0]?.url ?? null;
   const gallery = photos.filter((p) => p.url !== heroImage).slice(0, 6);

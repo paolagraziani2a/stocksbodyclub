@@ -1,6 +1,5 @@
 import "server-only";
-import { createClient } from "@supabase/supabase-js";
-import { publicEnv } from "@/lib/env";
+import { asAnon } from "@/lib/db";
 
 export type Appearance = {
   color_background: string;
@@ -72,12 +71,11 @@ export const brandName = (a: Pick<Appearance, "hero_title" | "hero_title_accent"
   [a.hero_title, a.hero_title_accent].filter(Boolean).join(" ");
 export const BUTTON_SHAPES = { pill: "Arrondis (pilule)", rounded: "Légèrement arrondis", square: "Droits" } as const;
 
-/** Lecture publique (clé anon, sans cookie) : la page reste rapide et cacheable. */
+/** Lecture publique de l'apparence du site (valeurs par défaut si la base est indisponible). */
 export async function getAppearance(): Promise<Appearance> {
-  if (!publicEnv.supabaseUrl) return DEFAULT_APPEARANCE;
+  if (!process.env.DATABASE_URL) return DEFAULT_APPEARANCE;
   try {
-    const supabase = createClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, { auth: { persistSession: false } });
-    const { data } = await supabase.from("site_appearance").select("*").single();
+    const data = await asAnon((tx) => tx.one<Partial<Appearance>>("select * from public.site_appearance"));
     return { ...DEFAULT_APPEARANCE, ...(data ?? {}) };
   } catch {
     return DEFAULT_APPEARANCE;

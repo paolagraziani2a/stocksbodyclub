@@ -1,15 +1,11 @@
 import "server-only";
 import type { ReactNode } from "react";
 import { Display, Label, Section } from "@/components/site";
-import { createClient } from "@supabase/supabase-js";
-import { publicEnv } from "@/lib/env";
+import { getAppearance } from "@/lib/appearance";
+import { getPublicSettings } from "@/lib/site";
 
 export async function getLegal() {
-  const supabase = createClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, { auth: { persistSession: false } });
-  const [{ data: s }, { data: a }] = await Promise.all([
-    supabase.from("studio_settings").select("studio_name, cancel_window_hours, unlimited_late_cancel_limit").single(),
-    supabase.from("site_appearance").select("address, contact_email").single(),
-  ]);
+  const [s, a] = await Promise.all([getPublicSettings(), getAppearance()]);
   return {
     studio: s?.studio_name ?? "The Body Club",
     cancelHours: s?.cancel_window_hours ?? 12,

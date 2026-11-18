@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Card, Empty, Input, PageHeader, Table, buttonStyles } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { adminTx, requireAdmin } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { formatPhone } from "@/lib/phone";
-import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Clientes" };
 
@@ -17,18 +16,19 @@ export default async function ClientsPage({ searchParams }: PageProps<"/admin/cl
   await requireAdmin();
   const { q } = await searchParams;
   const query = typeof q === "string" ? q.trim().slice(0, 60) : "";
-  const supabase = await createClient();
-
-  let req = supabase.from("profiles")
-    .select("id, first_name, last_name, email, phone, created_at, passes(credits_remaining, expires_at, is_unlimited, revoked_at)")
-    .eq("role", "client").is("anonymized_at", null).order("created_at", { ascending: false }).limit(100);
-  if (query) {
-    // échappement des caractères spéciaux du filtre PostgREST
-    const safe = query.replace(/[%,()*\\]/g, " ");
-    const digits = safe.replace(/\D/g, "").replace(/^0/, "");
-    req = req.or([`first_name.ilike.%${safe}%`, `last_name.ilike.%${safe}%`, `email.ilike.%${safe}%`, digits.length >= 4 ? `phone.ilike.%${digits}%` : null].filter(Boolean).join(","));
-  }
-  const { data } = await req.returns<Row[]>();
+  // recherche par nom, email ou téléphone (requête paramétrée : aucune injection possible)
+  const like = `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  const digits = query.replace(/\D/g, "").replace(/^0/, "");
+  const data = await adminTx((tx) => tx.many<Row>(
+    `select p.id, p.first_name, p.last_name, p.email, p.phone, p.created_at,
+            coalesce((select json_agg(json_build_object('credits_remaining', x.credits_remaining, 'expires_at', x.expires_at,
+                       'is_unlimited', x.is_unlimited, 'revoked_at', x.revoked_at)) from public.passes x where x.user_id = p.id), '[]') as passes
+     from public.profiles p
+     where p.role = 'client' and p.anonymized_at is null
+       and ($1 = '' or p.first_name ilike $2 or p.last_name ilike $2 or p.email ilike $2
+            or (length($3) >= 4 and p.phone like '%' || $3 || '%'))
+     order by p.created_at desc limit 100`,
+    [query, like, digits]));
   const now = new Date().toISOString();
 
   return (

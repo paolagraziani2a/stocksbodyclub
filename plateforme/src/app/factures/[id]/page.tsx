@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { formatDate } from "@/lib/dates";
 import { formatEuros } from "@/lib/money";
-import { createClient } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/auth";
+import { asUser } from "@/lib/db";
 import { PrintButton } from "./print-button";
 
 export const metadata: Metadata = { title: "Facture", robots: { index: false } };
@@ -12,15 +13,23 @@ type Line = { label: string; quantity: number; unit_ttc_cents: number };
 /** Facture imprimable / enregistrable en PDF. Visible par la cliente concernée et l'admin (RLS). */
 export default async function InvoicePage({ params }: PageProps<"/factures/[id]">) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) redirect(`/connexion?suite=/factures/${id}`);
+  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
-  const { data: inv } = await supabase.from("invoices").select("*").eq("id", id).maybeSingle();
+  // RLS : la cliente ne voit que ses factures, l'admin toutes
+  const { inv, related } = await asUser(user.id, async (tx) => {
+    const inv = await tx.one<{
+      kind: string; number: string; issued_at: string; seller: unknown; buyer: unknown; lines: unknown; vat_rate: number;
+      total_ht_cents: number; total_vat_cents: number; total_ttc_cents: number; payment_method: string; footer: string | null;
+      related_invoice_id: string | null;
+    }>("select * from public.invoices where id = $1", [id]);
+    const related = inv?.related_invoice_id
+      ? await tx.one<{ number: string }>("select number from public.invoices where id = $1", [inv.related_invoice_id])
+      : null;
+    return { inv, related };
+  });
   if (!inv) notFound();
-  const { data: related } = inv.related_invoice_id
-    ? await supabase.from("invoices").select("number").eq("id", inv.related_invoice_id).maybeSingle()
-    : { data: null };
 
   const seller = inv.seller as Record<string, string>;
   const buyer = inv.buyer as { name: string; email: string };

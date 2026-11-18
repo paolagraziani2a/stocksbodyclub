@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Field, Input, PageHeader, buttonStyles, cn } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { adminTx, requireAdmin } from "@/lib/auth";
 import { addDays, formatTime, isValidDay, labelOfDay, mondayOf, parisDay } from "@/lib/dates";
-import { createClient } from "@/lib/supabase/server";
 import { copyWeek, createSessions } from "./actions";
 import { SessionFields, type TeacherOption, type TypeOption } from "./session-fields";
 
@@ -23,18 +22,19 @@ export default async function PlanningPage({ searchParams }: PageProps<"/admin/p
   const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
   const newDay = isValidDay(sp.jour) ? sp.jour : days.includes(today) ? today : monday;
 
-  const supabase = await createClient();
-  const [{ data: sessions }, { data: teachers }, { data: types }] = await Promise.all([
-    supabase
-      .from("class_sessions")
-      .select("id, title, starts_at, ends_at, capacity, booked_count, status, teacher_id, teachers(display_name), class_types(color)")
-      .gte("starts_at", `${addDays(monday, -1)}T00:00:00Z`)
-      .lt("starts_at", `${addDays(monday, 8)}T00:00:00Z`)
-      .order("starts_at")
-      .returns<Row[]>(),
-    supabase.from("teachers").select("id, display_name, disciplines").eq("active", true).order("display_name").returns<TeacherOption[]>(),
-    supabase.from("class_types").select("id, name, discipline, duration_minutes, default_capacity").eq("active", true).order("sort_order").returns<TypeOption[]>(),
-  ]);
+  const { sessions, teachers, types } = await adminTx(async (tx) => ({
+    sessions: await tx.many<Row>(
+      `select s.id, s.title, s.starts_at, s.ends_at, s.capacity, s.booked_count, s.status, s.teacher_id,
+              case when t.id is null then null else json_build_object('display_name', t.display_name) end as teachers,
+              case when ct.id is null then null else json_build_object('color', ct.color) end as class_types
+       from public.class_sessions s
+       left join public.teachers t on t.id = s.teacher_id
+       left join public.class_types ct on ct.id = s.class_type_id
+       where s.starts_at >= $1 and s.starts_at < $2 order by s.starts_at`,
+      [`${addDays(monday, -1)}T00:00:00Z`, `${addDays(monday, 8)}T00:00:00Z`]),
+    teachers: await tx.many<TeacherOption>("select id, display_name, disciplines from public.teachers where active order by display_name"),
+    types: await tx.many<TypeOption>("select id, name, discipline, duration_minutes, default_capacity from public.class_types where active order by sort_order"),
+  }));
 
   const byDay = new Map(days.map((d) => [d, [] as Row[]]));
   for (const s of sessions ?? []) byDay.get(parisDay(s.starts_at))?.push(s);

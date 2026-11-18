@@ -11,11 +11,16 @@
     "test:db": "vitest run --project db",
     "test:unit": "vitest run --project unit",
     "typecheck": "next typegen && tsc --noEmit",
-    "demo": "node --env-file=.env.local scripts/demo-data.mjs"
+    "demo": "node --env-file-if-exists=.env.local scripts/demo-data.mjs",
+    "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
+    "db:seed": "node --env-file-if-exists=.env.local scripts/migrate.mjs --seed",
+    "admin:create": "node --env-file-if-exists=.env.local scripts/create-admin.mjs",
+    "vercel-build": "node scripts/migrate.mjs --seed && next build"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.119.0",
+    "@vercel/blob": "^2.9.0",
+    "better-auth": "^1.7.25",
+    "kysely": "^0.29.9",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -31,7 +36,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "pg": "^8.23.1",
-    "supabase": "^2.122.1",
     "tailwindcss": "4.3.3",
     "typescript": "^5",
     "vitest": "^5.1.1"

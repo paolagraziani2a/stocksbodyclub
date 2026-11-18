@@ -2,10 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireAdmin, type ActionResult } from "@/lib/auth";
-import { errorMessage } from "@/lib/errors";
+import { adminRun, requireAdmin, type ActionResult } from "@/lib/auth";
 import { hasFile, uploadImage } from "@/lib/storage";
-import { createClient } from "@/lib/supabase/server";
 
 const schema = z.object({
   id: z.string().uuid(),
@@ -29,7 +27,6 @@ export async function saveTeacherProfile(_p: ActionResult, form: FormData): Prom
   const disciplines = disciplinesSchema.safeParse(form.getAll("disciplines"));
   if (!disciplines.success) return { ok: false, message: disciplines.error.issues[0].message };
 
-  const supabase = await createClient();
   const update: Record<string, unknown> = {
     ...rest,
     disciplines: disciplines.data,
@@ -40,13 +37,17 @@ export async function saveTeacherProfile(_p: ActionResult, form: FormData): Prom
   try {
     const photo = form.get("photo");
     if (form.get("photo_remove") === "on") update.photo_url = null;
-    else if (hasFile(photo)) update.photo_url = await uploadImage(supabase, photo, "coachs");
+    else if (hasFile(photo)) update.photo_url = await uploadImage(photo, "coachs");
   } catch (e) {
     return { ok: false, message: (e as Error).message };
   }
 
-  const { data, error } = await supabase.from("teachers").update(update).eq("id", id).select("slug").single();
-  if (error) return { ok: false, message: errorMessage(error) };
+  const r = await adminRun(async (tx) => {
+    await tx.update("public.teachers", update, id);
+    return tx.one<{ slug: string }>("select slug from public.teachers where id = $1", [id]);
+  });
+  if (!r.ok || !r.data) return { ok: false, message: r.ok ? "Professeur introuvable." : r.message };
+  const data = r.data;
   revalidatePath("/coachs");
   revalidatePath(`/coachs/${data.slug}`);
   revalidatePath("/");

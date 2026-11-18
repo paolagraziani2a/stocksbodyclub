@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Card, Empty, Field, Input, PageHeader, Stat, Table, buttonStyles } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { adminTx, requireAdmin } from "@/lib/auth";
 import { addDays, firstOfMonth, isValidDay, labelOfDay, lastOfMonth, mondayOf, parisDay } from "@/lib/dates";
 import { formatEuros } from "@/lib/money";
-import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Tableau de bord" };
 
@@ -25,20 +24,19 @@ const pct = (x: number) => `${Math.round(x * 100)} %`;
 export default async function DashboardPage({ searchParams }: PageProps<"/admin">) {
   await requireAdmin();
   const sp = await searchParams;
-  const supabase = await createClient();
 
   const today = parisDay();
   const week = { from: mondayOf(today), to: addDays(mondayOf(today), 6) };
   const month = { from: firstOfMonth(today), to: lastOfMonth(today) };
   const custom = isValidDay(sp.du) && isValidDay(sp.au) && sp.du <= sp.au ? { from: sp.du, to: sp.au } : null;
 
-  const [dash, payWeek, payMonth, top, customSummary] = await Promise.all([
-    supabase.rpc("admin_dashboard"),
-    supabase.rpc("admin_teacher_pay", { p_from: week.from, p_to: week.to }),
-    supabase.rpc("admin_teacher_pay", { p_from: month.from, p_to: month.to }),
-    supabase.rpc("admin_top_clients", { p_from: month.from, p_to: month.to, p_limit: 10 }),
-    custom ? supabase.rpc("admin_revenue_summary", { p_from: custom.from, p_to: custom.to }) : Promise.resolve({ data: null }),
-  ]);
+  const { dash, payWeek, payMonth, top, customSummary } = await adminTx(async (tx) => ({
+    dash: { data: (await tx.one<{ r: unknown }>("select public.admin_dashboard() as r"))?.r },
+    payWeek: { data: await tx.many("select * from public.admin_teacher_pay($1, $2)", [week.from, week.to]) },
+    payMonth: { data: await tx.many("select * from public.admin_teacher_pay($1, $2)", [month.from, month.to]) },
+    top: { data: await tx.many("select * from public.admin_top_clients($1, $2, 10)", [month.from, month.to]) },
+    customSummary: { data: custom ? (await tx.one<{ r: Summary }>("select public.admin_revenue_summary($1, $2) as r", [custom.from, custom.to]))?.r ?? null : null },
+  }));
 
   const d = dash.data as { today: Summary; week: Summary; month: Summary } | null;
   if (!d) return <Empty>Impossible de charger le tableau de bord.</Empty>;

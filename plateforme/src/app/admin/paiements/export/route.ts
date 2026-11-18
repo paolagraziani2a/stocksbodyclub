@@ -1,24 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { parisDay } from "@/lib/dates";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/auth";
+import { asUser } from "@/lib/db";
 
 /** Export CSV des factures et avoirs d'un mois (pour le comptable). Admin uniquement (RLS + contrôle du rôle). */
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return new NextResponse("Non connecté", { status: 401 });
-  const { data: isAdmin } = await supabase.rpc("is_admin");
-  if (!isAdmin) return new NextResponse("Accès refusé", { status: 403 });
+  const profile = await getCurrentProfile();
+  if (!profile) return new NextResponse("Non connecté", { status: 401 });
+  if (profile.role !== "admin") return new NextResponse("Accès refusé", { status: 403 });
 
   const month = request.nextUrl.searchParams.get("mois") ?? "";
   if (!/^\d{4}-\d{2}$/.test(month)) return new NextResponse("Mois invalide", { status: 400 });
   const [y, m] = month.split("-").map(Number);
 
-  const { data } = await supabase.from("invoices")
-    .select("number, kind, issued_at, buyer, lines, total_ht_cents, total_vat_cents, total_ttc_cents, vat_rate")
-    .gte("issued_at", new Date(Date.UTC(y, m - 1, 1, -3)).toISOString())
-    .lt("issued_at", new Date(Date.UTC(y, m, 1, 3)).toISOString())
-    .order("year").order("kind").order("seq");
+  const data = await asUser(profile.id, (tx) => tx.many<{
+    number: string; kind: string; issued_at: string; buyer: { name?: string; email?: string } | null; lines: unknown;
+    total_ht_cents: number; total_vat_cents: number; total_ttc_cents: number; vat_rate: number;
+  }>(
+    `select number, kind, issued_at, buyer, lines, total_ht_cents, total_vat_cents, total_ttc_cents, vat_rate
+     from public.invoices where issued_at >= $1 and issued_at < $2 order by year, kind, seq`,
+    [new Date(Date.UTC(y, m - 1, 1, -3)).toISOString(), new Date(Date.UTC(y, m, 1, 3)).toISOString()]));
 
   const euros = (c: number) => (c / 100).toFixed(2).replace(".", ",");
   // texte libre neutralisé contre l'injection de formules ; montants laissés tels quels
