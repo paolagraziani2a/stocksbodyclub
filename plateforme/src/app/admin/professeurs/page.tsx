@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { CoachPortrait } from "@/components/site";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, Card, Empty, Field, Input, PageHeader, Select } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
@@ -10,7 +12,7 @@ import { createTeacher, setPayRule, setTeacherActive } from "./actions";
 export const metadata: Metadata = { title: "Professeurs" };
 
 type Rule = { mode: "percent" | "fixed_per_class" | "per_attendee" | "none"; percent: number | null; fixed_cents: number | null; per_attendee_cents: number | null; valid_from: string };
-type Teacher = { id: string; display_name: string; active: boolean; teacher_pay_rules: Rule[] };
+type Teacher = { id: string; display_name: string; headline: string; photo_url: string | null; active: boolean; teacher_pay_rules: Rule[] };
 
 function describe(r?: Rule) {
   if (!r) return "Aucune règle";
@@ -48,7 +50,7 @@ export default async function TeachersPage() {
   const supabase = await createClient();
   const [{ data: teachers }, { data: settings }] = await Promise.all([
     supabase.from("teachers")
-      .select("id, display_name, active, teacher_pay_rules(mode, percent, fixed_cents, per_attendee_cents, valid_from)")
+      .select("id, display_name, headline, photo_url, active, teacher_pay_rules(mode, percent, fixed_cents, per_attendee_cents, valid_from)")
       .order("active", { ascending: false }).order("display_name").returns<Teacher[]>(),
     supabase.from("studio_settings").select("teacher_pay_base, late_cancel_counts_for_teacher").single(),
   ]);
@@ -69,9 +71,15 @@ export default async function TeachersPage() {
             return (
               <Card key={t.id} className={t.active ? "" : "opacity-60"}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-2xl">{t.display_name}</h2>
-                    <p className="mt-1 text-sm text-muted">{describe(current)}</p>
+                  <div className="flex items-center gap-4">
+                    <CoachPortrait coach={t} small className="h-14 w-14 shrink-0 rounded-full" />
+                    <div>
+                      <h2 className="text-2xl">{t.display_name}</h2>
+                      <p className="mt-0.5 text-sm text-muted">{describe(current)}</p>
+                      <Link href={`/admin/professeurs/${t.id}`} className="mt-1 inline-block text-sm text-taupe-deep underline decoration-line underline-offset-4">
+                        {t.headline || t.photo_url ? "Modifier le profil public" : "Créer son profil public (photo, présentation)"}
+                      </Link>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {!t.active && <Badge>Inactif</Badge>}

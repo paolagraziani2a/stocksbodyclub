@@ -97,9 +97,14 @@ export function AppearanceEditor({ initial }: { initial: Appearance }) {
             <Field label="Phrase d'accroche" className="sm:col-span-2">
               <Input name="hero_subtitle" value={a.hero_subtitle} onChange={(e) => set("hero_subtitle", e.target.value)} maxLength={200} />
             </Field>
+            <Field label="Petit titre « studio »" hint="Ex. Bienvenue au studio"><Input name="welcome_title" defaultValue={a.welcome_title} maxLength={80} /></Field>
             <Field label="Titre de présentation"><Input name="about_title" defaultValue={a.about_title} maxLength={80} /></Field>
-            <Field label="Texte de présentation" className="sm:col-span-2">
+            <Field label="Texte de présentation du studio" className="sm:col-span-2">
               <Textarea name="about_text" defaultValue={a.about_text} maxLength={2000} />
+            </Field>
+            <Field label="Titre « méthode »"><Input name="method_title" defaultValue={a.method_title} maxLength={80} /></Field>
+            <Field label="Texte « méthode »" hint="Laisser vide pour masquer cette partie" className="sm:col-span-2">
+              <Textarea name="method_text" defaultValue={a.method_text} maxLength={1500} />
             </Field>
             <ImageField name="logo" label="Logo" url={a.logo_url} />
             <ImageField name="hero_image" label="Photo d'accueil" url={a.hero_image_url} />
@@ -109,7 +114,13 @@ export function AppearanceEditor({ initial }: { initial: Appearance }) {
         <Card>
           <h2 className="text-2xl">Coordonnées</h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <Field label="Adresse" className="sm:col-span-2"><Input name="address" defaultValue={a.address} maxLength={200} /></Field>
+            <Field label="Adresse" hint="Un bouton « Itinéraire » est créé automatiquement" className="sm:col-span-2"><Input name="address" defaultValue={a.address} maxLength={200} /></Field>
+            <Field label="Horaires d'ouverture" className="sm:col-span-2">
+              <Textarea name="opening_hours" defaultValue={a.opening_hours} maxLength={500} className="min-h-20" placeholder={"Lundi – vendredi : 7h – 21h\nSamedi : 9h – 13h"} />
+            </Field>
+            <Field label="Accès" className="sm:col-span-2">
+              <Textarea name="access_info" defaultValue={a.access_info} maxLength={500} className="min-h-16" placeholder="Métro, parking, vestiaires, douches…" />
+            </Field>
             <Field label="Email"><Input type="email" name="contact_email" defaultValue={a.contact_email} /></Field>
             <Field label="Téléphone"><Input name="contact_phone" defaultValue={a.contact_phone} maxLength={30} /></Field>
             <Field label="Instagram" className="sm:col-span-2"><Input type="url" name="instagram_url" defaultValue={a.instagram_url} placeholder="https://instagram.com/…" /></Field>

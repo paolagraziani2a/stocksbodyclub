@@ -37,5 +37,6 @@ export async function saveSettings(_p: ActionResult, form: FormData): Promise<Ac
   const { error } = await supabase.from("studio_settings").update(parsed.data).eq("id", true);
   if (error) return { ok: false, message: errorMessage(error) };
   revalidatePath("/admin", "layout");
+  revalidatePath("/tarifs");
   return { ok: true, message: "Réglages enregistrés." };
 }

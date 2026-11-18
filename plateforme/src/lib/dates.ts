@@ -64,3 +64,8 @@ export function isValidDay(s: unknown): s is string {
 export function labelOfDay(day: string, opts: Intl.DateTimeFormatOptions = { weekday: "long", day: "numeric", month: "long" }) {
   return new Intl.DateTimeFormat("fr-FR", { ...opts, timeZone: "UTC" }).format(parse(day));
 }
+
+/** Le cours n'a pas encore commencé. */
+export function isUpcoming(iso: string): boolean {
+  return new Date(iso).getTime() > Date.now();
+}

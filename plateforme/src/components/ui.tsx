@@ -4,7 +4,7 @@ export function cn(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(" ");
 }
 
-const buttonBase =
+export const buttonBase =
   "btn inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm tracking-wide transition disabled:opacity-50 disabled:pointer-events-none";
 export const buttonStyles = {
   primary: `${buttonBase} bg-ink text-ivory hover:bg-taupe-deep`,

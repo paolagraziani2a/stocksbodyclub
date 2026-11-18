@@ -333,3 +333,39 @@ describe("Apparence du site", () => {
     await asUser(admin, (c) => c.query("update public.site_appearance set color_accent = '#9c7f70'"));
   });
 });
+
+describe("Profils des coachs et pages publiques", () => {
+  it("adresse de page lisible, unique, accents retirés", async () => {
+    const { rows } = await pool.query(
+      "insert into public.teachers (display_name) values ('Léa Été'), ('Léa Été') returning slug");
+    expect(rows[0].slug).toMatch(/^lea-ete(-\d+)?$/);
+    expect(rows[1].slug).not.toBe(rows[0].slug);
+  });
+
+  it("un visiteur voit le profil public, jamais le compte lié ni la rémunération", async () => {
+    const t = await createTeacher(await createUser("teacher"));
+    await pool.query("update public.teachers set headline = 'Coach certifiée', specialties = '{Sculpt,Core}' where id = $1", [t]);
+    await asUser(null, async (c) => {
+      const { rows } = await c.query("select display_name, headline, specialties, photo_url from public.teachers where id = $1", [t]);
+      expect(rows[0]).toMatchObject({ headline: "Coach certifiée", specialties: ["Sculpt", "Core"] });
+    });
+    expect(await errorOf(asUser(null, (c) => c.query("select profile_id from public.teachers")))).toMatch(/permission denied/);
+    expect(await errorOf(asUser(null, (c) => c.query("select * from public.teacher_pay_rules")))).toMatch(/permission denied/);
+  });
+
+  it("photos du studio : lisibles par tous, ajoutées par l'admin uniquement", async () => {
+    const client = await createUser();
+    expect(await errorOf(asUser(client, (c) =>
+      c.query("insert into public.site_photos (url) values ('https://x.test/a.jpg')")))).toMatch(/row-level security/);
+    await asUser(await getAdmin(), (c) => c.query("insert into public.site_photos (url, alt) values ('https://x.test/a.jpg', 'Salle')"));
+    await asUser(null, async (c) => {
+      expect((await c.query("select count(*)::int as n from public.site_photos")).rows[0].n).toBeGreaterThan(0);
+    });
+  });
+
+  it("un lien Instagram doit être en https (pas de javascript:)", async () => {
+    const t = await createTeacher();
+    expect(await errorOf(pool.query("update public.teachers set instagram_url = 'javascript:alert(1)' where id = $1", [t])))
+      .toMatch(/check constraint/);
+  });
+});

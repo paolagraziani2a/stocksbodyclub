@@ -103,6 +103,45 @@ for (const s of sessions) {
 const { rows: [toRefund] } = await db.query("select id from public.orders where product_name = 'Carte 1 cours' and status = 'paid' limit 1");
 await db.query("select public.process_refund($1, 're_demo_1', 3500, null, 'Erreur de commande')", [toRefund.id]);
 
+// Profils des coachs (textes fictifs) et page d'accueil
+await as(admin, `update public.teachers set headline = 'Coach Lagree certifiée', sort_order = 1,
+  quote = 'Lentement, c''est là que tout se passe.',
+  bio = 'Ancienne danseuse, Camille a découvert le Lagree à Londres et ne l''a plus quitté. Ses cours sont précis, exigeants et bienveillants : elle corrige chaque posture pour que vous sentiez exactement le bon muscle travailler.',
+  specialties = '{Sculpt,Gainage,Débutantes}', certifications = 'Certification Lagree Fitness (niveau 2)
+Diplôme de danse classique'
+  where display_name = 'Camille'`);
+await as(admin, `update public.teachers set headline = 'Coach Lagree & préparation physique', sort_order = 2,
+  quote = 'Chaque séance vous rend un peu plus forte.',
+  bio = 'Léa vient de la préparation physique. Ses cours de midi sont rythmés et efficaces : 50 minutes pour repartir pleine d''énergie.',
+  specialties = '{Cardio,Endurance,Express}', certifications = 'Certification Lagree Fitness
+BPJEPS Activités de la forme'
+  where display_name = 'Léa'`);
+await as(admin, `update public.teachers set headline = 'Fondatrice du studio', sort_order = 0,
+  quote = 'J''ai créé le studio que j''aurais aimé trouver.',
+  bio = 'Passionnée de Lagree, Pao a fondé The Body Club pour proposer une pratique exigeante dans un cadre chaleureux et intimiste. Elle donne les cours du soir.',
+  specialties = '{Full body,Sculpt}', certifications = 'Certification Lagree Fitness'
+  where display_name = 'Pao'`);
+await as(admin, `update public.site_appearance set
+  about_text = 'Huit Megaformers, une lumière douce, des coachs certifiés : The Body Club est un studio intimiste dédié au Lagree, où chaque cours se vit comme un moment pour soi.',
+  address = '12 rue de l''Exemple
+75000 Paris',
+  opening_hours = 'Lundi – vendredi : 7h – 21h
+Samedi : 9h – 13h',
+  access_info = 'Métro ligne 1, station Exemple (3 min à pied).
+Vestiaires, douches et serviettes fournies.',
+  contact_email = 'bonjour@bodyclub.test', contact_phone = '01 23 45 67 89',
+  instagram_url = 'https://instagram.com/thebodyclub'`);
+
+// Photos du studio (images de démonstration)
+const { readFileSync, readdirSync } = await import("node:fs");
+const dir = new URL("./demo-images/", import.meta.url);
+for (const [i, f] of readdirSync(dir).sort().entries()) {
+  const path = `studio/demo-${f}`;
+  await supabase.storage.from("site").upload(path, readFileSync(new URL(f, dir)), { contentType: "image/jpeg", upsert: true });
+  const url = supabase.storage.from("site").getPublicUrl(path).data.publicUrl;
+  await db.query("insert into public.site_photos (url, alt, sort_order) values ($1, $2, $3)", [url, `Le studio — photo ${i + 1}`, i]);
+}
+
 console.log("Données de démonstration créées.");
 console.log("Admin : pao@bodyclub.test / bodyclub-demo");
 console.log("Professeure : camille@bodyclub.test / bodyclub-demo");

@@ -122,6 +122,9 @@ La CI GitHub Actions (`.github/workflows/plateforme.yml`) exécute tout cela à 
       planning (création rapide, professeur, séries, duplication de semaine, présences, annulation),
       paiements & factures (liens Stripe, export CSV), professeurs, apparence du site, réglages
 - [x] Factures et avoirs, abonnement illimité, cartes offertes, 73 tests
+- [x] Site client : accueil (photos du studio, méthode, coachs, tarifs, infos pratiques, itinéraire),
+      pages « Les coachs » et profil de chaque coach (photo, présentation, spécialités, prochains cours),
+      tarifs, planning public avec places restantes ; profils et galerie modifiables depuis l'admin
 - [ ] Lot 4 — administration : fiches clientes, produits
 - [ ] Lot 6 — liste d'attente (emails), confirmations, PWA, tâches planifiées
 - [ ] Lot 7 — import bsport, sauvegardes, mise en production

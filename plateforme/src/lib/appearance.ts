@@ -19,6 +19,11 @@ export type Appearance = {
   hero_subtitle: string;
   about_title: string;
   about_text: string;
+  welcome_title: string;
+  method_title: string;
+  method_text: string;
+  opening_hours: string;
+  access_info: string;
   address: string;
   contact_email: string;
   contact_phone: string;
@@ -42,6 +47,11 @@ export const DEFAULT_APPEARANCE: Appearance = {
   hero_subtitle: "Réservez votre prochain cours en quelques secondes.",
   about_title: "Le studio",
   about_text: "",
+  welcome_title: "Bienvenue au studio",
+  method_title: "La méthode Lagree",
+  method_text: "",
+  opening_hours: "",
+  access_info: "",
   address: "",
   contact_email: "",
   contact_phone: "",
